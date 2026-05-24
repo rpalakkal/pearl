@@ -1,6 +1,8 @@
 import { ipcMain } from 'electron';
 import { ManagerService } from '../services/manager-service';
 import { BlockbookClient } from '../clients/blockbook-client';
+import { HardwareWalletService } from '../services/hardware-wallet-service/hardware-wallet-service.ts';
+import type { HardwareWalletBroadcastRequest } from '../../types/app-bridge.ts';
 
 function registerWalletIpc(ms: ManagerService) {
   ipcMain.handle('wallet-unlock', (_event, passphrase: string, timeout: number = 60) =>
@@ -27,8 +29,14 @@ function registerWalletIpc(ms: ManagerService) {
     ms.ensureWalletService().validateAddress(address)
   );
   ipcMain.handle('wallet-get-new-address', _event => ms.ensureWalletService().getNewAddress());
-  ipcMain.handle('wallet-estimate-fee', (_event, numBlocks: number) =>
-    BlockbookClient.estimateFee(numBlocks)
+  ipcMain.handle('wallet-estimate-fee', (_event, numBlocks: number, network?: 'mainnet' | 'testnet') =>
+    BlockbookClient.estimateFee(numBlocks, network)
+  );
+  ipcMain.handle('hardware-wallet-get-balance', (_event, address: string, network?: 'mainnet' | 'testnet') =>
+    HardwareWalletService.getBalance(address, network)
+  );
+  ipcMain.handle('hardware-wallet-broadcast-transaction', (_event, request: HardwareWalletBroadcastRequest) =>
+    HardwareWalletService.broadcastTransaction(request)
   );
 }
 

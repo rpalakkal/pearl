@@ -19,6 +19,9 @@
     "gatekeeperAssess": false,
     "entitlements": "build/entitlements.mac.plist",
     "entitlementsInherit": "build/entitlements.mac.plist",
+    "extendInfo": {
+      "NSLocalNetworkUsageDescription": "Pearl Wallet connects to Trezor Bridge or Trezor Suite on this computer when using a Trezor hardware wallet."
+    },
     "notarize": false,
     "target": [
       {

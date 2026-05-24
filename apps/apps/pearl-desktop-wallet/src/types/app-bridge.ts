@@ -15,6 +15,7 @@ type PromisifyInterface<T> = {
 };
 
 type Ipc<T> = PromisifyInterface<T>;
+type AppNetwork = 'mainnet' | 'testnet';
 
 interface WindowApi {
   getVersion: () => string;
@@ -49,7 +50,47 @@ interface WalletApi {
 
   validateAddress: (address: string) => Promise<{ isValid: boolean }>;
 
-  estimateFee: (numBlocks: number) => Promise<number>;
+  estimateFee: (numBlocks: number, network?: AppNetwork) => Promise<number>;
+}
+
+interface BlockbookAddressInfo {
+  address: string;
+  balance: string;
+  totalReceived: string;
+  totalSent: string;
+  unconfirmedBalance: string;
+  unconfirmedTxs: number;
+  txs: number;
+}
+
+interface BlockbookUtxo {
+  txid: string;
+  vout: number;
+  value: string;
+  height?: number;
+  confirmations?: number;
+}
+
+interface HardwareWalletBalance {
+  info: BlockbookAddressInfo;
+  utxos: BlockbookUtxo[];
+}
+
+interface HardwareWalletBroadcastRequest {
+  network?: AppNetwork;
+  rawTransactionHex: string;
+  sourceAddress: string;
+}
+
+interface HardwareWalletBroadcastResult {
+  balance: HardwareWalletBalance | null;
+  txid: string;
+}
+
+interface HardwareWalletApi {
+  getBalance: (address: string, network?: AppNetwork) => Promise<HardwareWalletBalance>;
+
+  broadcastTransaction: (request: HardwareWalletBroadcastRequest) => Promise<HardwareWalletBroadcastResult>;
 }
 
 interface ManagerApi {
@@ -156,9 +197,10 @@ interface SyncApi {
 interface AppBridge {
   window: Ipc<WindowApi>;
   wallet: Ipc<WalletApi>;
+  hardwareWallet: Ipc<HardwareWalletApi>;
   manager: Ipc<ManagerApi>;
   sync: Ipc<SyncApi>;
   update: UpdateApi;
 }
 
-export type { AppBridge, WindowApi, WalletApi, ManagerApi, SyncApi, SyncProgress, SyncPhase, UpdateApi, UpdateStatus, UpdateSeverity, Ipc };
+export type { AppBridge, WindowApi, WalletApi, HardwareWalletApi, HardwareWalletBalance, HardwareWalletBroadcastRequest, HardwareWalletBroadcastResult, ManagerApi, SyncApi, SyncProgress, SyncPhase, UpdateApi, UpdateStatus, UpdateSeverity, BlockbookAddressInfo, BlockbookUtxo, AppNetwork, Ipc };

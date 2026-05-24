@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Lock, Eye, EyeOff, AlertCircle, ChevronDown, CheckCircle2 } from 'lucide-react';
+import { Lock, Eye, EyeOff, AlertCircle, ChevronDown, CheckCircle2, Usb } from 'lucide-react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useWalletStore } from '../store/walletStore';
 import { getErrorMessage } from '../lib/utils';
@@ -285,6 +285,15 @@ export default function WalletUnlock() {
             disabled={isUnlocking}
           >
             Create New Wallet
+          </button>
+
+          <button
+            onClick={() => navigate('/hardware-wallet')}
+            className="flex h-12 w-full items-center justify-center gap-2 rounded-xl border border-gray-300 bg-white py-3 font-semibold text-gray-900 transition-colors hover:bg-gray-100 sm:py-4"
+            disabled={isUnlocking}
+          >
+            <Usb className="h-5 w-5" />
+            Connect Hardware Wallet
           </button>
 
           {/* Warning */}

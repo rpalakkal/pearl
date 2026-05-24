@@ -1,6 +1,7 @@
 import { contextBridge, ipcRenderer } from 'electron';
 import {
   AppBridge,
+  HardwareWalletApi,
   Ipc,
   WindowApi,
   WalletApi,
@@ -35,7 +36,12 @@ const walletIpc: Ipc<WalletApi> = {
   listTransactions: (count, from) => ipcRenderer.invoke('wallet-list-transactions', count, from),
   getBalance: (account, minconf) => ipcRenderer.invoke('wallet-get-balance', account, minconf),
   validateAddress: address => ipcRenderer.invoke('wallet-validate-address', address),
-  estimateFee: numBlocks => ipcRenderer.invoke('wallet-estimate-fee', numBlocks),
+  estimateFee: (numBlocks, network) => ipcRenderer.invoke('wallet-estimate-fee', numBlocks, network),
+};
+
+const hardwareWalletIpc: Ipc<HardwareWalletApi> = {
+  getBalance: (address, network) => ipcRenderer.invoke('hardware-wallet-get-balance', address, network),
+  broadcastTransaction: request => ipcRenderer.invoke('hardware-wallet-broadcast-transaction', request),
 };
 
 const managerIpc: Ipc<ManagerApi> = {
@@ -74,6 +80,7 @@ const updateIpc: UpdateApi = {
 const appBridge: AppBridge = {
   window: windowIpc,
   wallet: walletIpc,
+  hardwareWallet: hardwareWalletIpc,
   manager: managerIpc,
   sync: syncIpc,
   update: updateIpc,

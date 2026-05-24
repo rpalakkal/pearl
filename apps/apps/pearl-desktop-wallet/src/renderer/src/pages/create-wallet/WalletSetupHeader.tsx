@@ -1,5 +1,3 @@
-import { Wallet } from 'lucide-react';
-
 export default function WalletSetupHeader() {
   return (
     <div className="mb-6 text-center sm:mb-8">

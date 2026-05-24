@@ -34,7 +34,8 @@ mongodb-data
 apps/cloud-mining/e2e/test-results/
 
 # pearl-desktop-wallet
-apps/pearl-desktop-wallet/build
+apps/pearl-desktop-wallet/build/*
+!apps/pearl-desktop-wallet/build/entitlements.mac.plist
 apps/cloud-mining/frontend/public/downloads/
 
 electron.vite.config.*.mjs

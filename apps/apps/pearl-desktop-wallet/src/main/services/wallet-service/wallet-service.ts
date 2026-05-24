@@ -1,9 +1,8 @@
 import { RpcClient, RpcConfig } from '../rpc-client.ts';
 import { formatAndSortTransactions } from './transaction-formatter.ts';
 import { WalletRpcMethods } from './wallet-rpc-methods.ts';
-import { WalletApi } from '../../../types/app-bridge.ts';
 
-class WalletService extends WalletRpcMethods implements WalletApi {
+class WalletService extends WalletRpcMethods {
   constructor(config: RpcConfig) {
     super(
       new RpcClient({

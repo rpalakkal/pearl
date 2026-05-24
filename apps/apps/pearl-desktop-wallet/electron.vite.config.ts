@@ -20,10 +20,18 @@ export default defineConfig({
     },
   },
   renderer: {
+    define: {
+      process: 'globalThis.process',
+      global: 'globalThis',
+    },
     resolve: {
       alias: {
         '@renderer': resolve(__dirname, 'src/renderer/src'),
         '@': resolve(__dirname, 'src/renderer/src'),
+        crypto: resolve(__dirname, 'src/renderer/src/lib/nodeCryptoShim.ts'),
+        events: resolve(__dirname, 'node_modules/events'),
+        stream: resolve(__dirname, 'node_modules/stream-browserify'),
+        util: resolve(__dirname, 'node_modules/util'),
       },
     },
     plugins: [react()],

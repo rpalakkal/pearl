@@ -1,7 +1,6 @@
 import { spawn, ChildProcess } from 'child_process';
 import { join } from 'path';
 import { app } from 'electron';
-import log from 'electron-log';
 import fs from 'fs';
 import path from 'path';
 import { WalletService } from './wallet-service/wallet-service';
@@ -111,10 +110,11 @@ class WalletProcess {
   }
 
   private async startWalletProcess(
-    passphrase: string = 'walletpass',
+    passphrase?: string,
     seed?: string
   ): Promise<{ success: true; message: string; seed?: string } | { success: false; error: string }> {
     const binaryPath = this.getBinaryPath();
+    const walletPassphrase = passphrase ?? this.walletPassphrase;
 
     try {
       const networkConfig = getCurrentNetworkConfig();
@@ -134,7 +134,7 @@ class WalletProcess {
       walletConfigFile = path.join(this.config.dataDir, 'wallet-setup.json');
       const walletConfig = {
         seed,
-        privatepassphrase: passphrase,
+        privatepassphrase: walletPassphrase,
         bday: isImport ? '1724644369' : undefined,
       };
 

@@ -1,5 +1,5 @@
 import { Button } from '@/components/ui/button';
-import { ShieldCheck, ArrowRightLeft, BarChart3, Atom } from 'lucide-react';
+import { ShieldCheck, ArrowRightLeft, BarChart3, Usb } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useEffect, useState } from 'react';
 import { NetworkSelector } from '../components/NetworkSelector';
@@ -129,6 +129,17 @@ export default function WelcomePage() {
           className="w-full hover:bg-gray-100 hover:text-gray-900"
         >
           <Link to="/import-account">Restore Wallet From A Recovery Phrase</Link>
+        </Button>
+        <Button
+          asChild
+          variant="outline"
+          size="lg"
+          className="w-full hover:bg-gray-100 hover:text-gray-900"
+        >
+          <Link to="/hardware-wallet">
+            <Usb className="h-4 w-4" />
+            Connect Hardware Wallet
+          </Link>
         </Button>
       </div>
     </div>

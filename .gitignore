@@ -13,6 +13,8 @@ __pycache__/
 # Distribution / packaging
 .Python
 build/
+!apps/apps/pearl-desktop-wallet/build/
+!apps/apps/pearl-desktop-wallet/build/entitlements.mac.plist
 develop-eggs/
 dist/
 downloads/

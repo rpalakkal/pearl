@@ -30,11 +30,6 @@ const formatFullDate = (timestamp: number): string => {
   return date.toLocaleString();
 };
 
-const truncateAddress = (address: string): string => {
-  if (address.length <= 12) return address;
-  return `${address.slice(0, 6)}...${address.slice(-6)}`;
-};
-
 const truncateTxId = (txid: string): string => {
   if (txid.length <= 16) return txid;
   return `${txid.slice(0, 8)}...${txid.slice(-8)}`;
@@ -45,7 +40,6 @@ export default function ActivityPage({ onBack }: ActivityPageProps) {
     pageSize: 10,
   });
   const [copiedTxId, setCopiedTxId] = useState<string | null>(null);
-  const [copiedAddress, setCopiedAddress] = useState<string | null>(null);
 
   const handleCopyTxId = async (txid: string) => {
     try {
@@ -54,16 +48,6 @@ export default function ActivityPage({ onBack }: ActivityPageProps) {
       setTimeout(() => setCopiedTxId(null), 2000);
     } catch (err) {
       console.error('Failed to copy transaction ID:', err);
-    }
-  };
-
-  const handleCopyAddress = async (address: string) => {
-    try {
-      await navigator.clipboard.writeText(address);
-      setCopiedAddress(address);
-      setTimeout(() => setCopiedAddress(null), 2000);
-    } catch (err) {
-      console.error('Failed to copy address:', err);
     }
   };
 
