@@ -28,7 +28,7 @@ export default defineConfig({
       alias: {
         '@renderer': resolve(__dirname, 'src/renderer/src'),
         '@': resolve(__dirname, 'src/renderer/src'),
-        crypto: resolve(__dirname, 'src/renderer/src/lib/nodeCryptoShim.ts'),
+        crypto: resolve(__dirname, '../../packages/wallet-core/src/nodeCryptoShim.ts'),
         events: resolve(__dirname, 'node_modules/events'),
         stream: resolve(__dirname, 'node_modules/stream-browserify'),
         util: resolve(__dirname, 'node_modules/util'),

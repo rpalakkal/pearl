@@ -17,6 +17,13 @@ export function getPearlHardwareWalletPath(
   return `m/86'/${networkConfig[network].coinTypes[vendor]}'/0'/0/${normalizeHardwareWalletAddressIndex(addressIndex)}`;
 }
 
+export function getPearlBip86Path(
+  network: PearlNetwork,
+  addressIndex = DEFAULT_HARDWARE_WALLET_ADDRESS_INDEX
+): string {
+  return `m/86'/${networkConfig[network].coinTypes.ledger}'/0'/0/${normalizeHardwareWalletAddressIndex(addressIndex)}`;
+}
+
 export function getPearlHardwareWalletAccountPath(
   network: PearlNetwork,
   vendor: HardwareWalletVendor = 'trezor'

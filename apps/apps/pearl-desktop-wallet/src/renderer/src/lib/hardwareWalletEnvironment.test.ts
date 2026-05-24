@@ -7,7 +7,7 @@ import {
   createHash,
   randomBytes,
   randomInt,
-} from './nodeCryptoShim.ts';
+} from '@pearl/wallet-core/nodeCryptoShim';
 import {
   getTrustedHardwareWalletAppOrigins,
   isHardwareWalletDevice,
@@ -72,13 +72,13 @@ test('keeps renderer Node polyfills available for hardware signing dependencies'
     dependencies?: Record<string, string>;
   };
 
-  assert.match(viteConfig, /crypto:\s*resolve\(__dirname,\s*'src\/renderer\/src\/lib\/nodeCryptoShim\.ts'\)/);
+  assert.match(viteConfig, /crypto:\s*resolve\(__dirname,\s*'\.\.\/\.\.\/packages\/wallet-core\/src\/nodeCryptoShim\.ts'\)/);
   assert.match(viteConfig, /events:\s*resolve\(__dirname,\s*'node_modules\/events'\)/);
   assert.match(viteConfig, /stream:\s*resolve\(__dirname,\s*'node_modules\/stream-browserify'\)/);
   assert.match(viteConfig, /util:\s*resolve\(__dirname,\s*'node_modules\/util'\)/);
   assert.match(viteConfig, /process:\s*'globalThis\.process'/);
   assert.match(viteConfig, /global:\s*'globalThis'/);
-  assert.ok(packageJson.dependencies?.['@noble/ciphers']);
+  assert.ok(packageJson.dependencies?.['@pearl/wallet-core']);
   assert.ok(packageJson.dependencies?.events);
   assert.ok(packageJson.dependencies?.['stream-browserify']);
   assert.ok(packageJson.dependencies?.util);
@@ -87,7 +87,7 @@ test('keeps renderer Node polyfills available for hardware signing dependencies'
 test('preloads hardware wallet modules before user-triggered device prompts', () => {
   const hardwareWalletSource = readFileSync(new URL('./hardwareWallet.ts', import.meta.url), 'utf8');
   const browserSource = readFileSync(
-    new URL('./hardware-wallet/browser.ts', import.meta.url),
+    new URL('../../../../../../packages/wallet-core/src/hardware-wallet/browser.ts', import.meta.url),
     'utf8'
   );
   const hardwareWalletController = readFileSync(
@@ -95,7 +95,7 @@ test('preloads hardware wallet modules before user-triggered device prompts', ()
     'utf8'
   );
 
-  assert.match(hardwareWalletSource, /export \{ preloadHardwareWalletSupport \}/);
+  assert.match(hardwareWalletSource, /@pearl\/wallet-core\/hardware/);
   assert.match(browserSource, /export function preloadHardwareWalletSupport/);
   assert.match(browserSource, /ensureHardwareWalletBrowserGlobals\(\)\s*\n\s*\.then/);
   assert.match(browserSource, /Promise\.allSettled/);
@@ -107,19 +107,19 @@ test('preloads hardware wallet modules before user-triggered device prompts', ()
 
 test('installs the Buffer polyfill before loading browser hardware dependencies', () => {
   const browserSource = readFileSync(
-    new URL('./hardware-wallet/browser.ts', import.meta.url),
+    new URL('../../../../../../packages/wallet-core/src/hardware-wallet/browser.ts', import.meta.url),
     'utf8'
   );
   const ledgerSource = readFileSync(
-    new URL('./hardware-wallet/ledger.ts', import.meta.url),
+    new URL('../../../../../../packages/wallet-core/src/hardware-wallet/ledger.ts', import.meta.url),
     'utf8'
   );
   const trezorSource = readFileSync(
-    new URL('./hardware-wallet/trezor.ts', import.meta.url),
+    new URL('../../../../../../packages/wallet-core/src/hardware-wallet/trezor.ts', import.meta.url),
     'utf8'
   );
   const browserGlobalsSource = readFileSync(
-    new URL('./browserNodeGlobals.ts', import.meta.url),
+    new URL('../../../../../../packages/wallet-core/src/browserNodeGlobals.ts', import.meta.url),
     'utf8'
   );
   const rendererEntrySource = readFileSync(

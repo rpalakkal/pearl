@@ -1,0 +1,46 @@
+{
+  "name": "@pearl/wallet-core",
+  "version": "1.0.0",
+  "description": "Browser-safe Pearl hardware wallet primitives shared by Pearl apps",
+  "private": true,
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": {
+      "types": "./src/index.ts",
+      "default": "./src/index.ts"
+    },
+    "./browserNodeGlobals": {
+      "types": "./src/browserNodeGlobals.ts",
+      "default": "./src/browserNodeGlobals.ts"
+    },
+    "./hardware": {
+      "types": "./src/hardwareWallet.ts",
+      "default": "./src/hardwareWallet.ts"
+    },
+    "./nodeCryptoShim": {
+      "types": "./src/nodeCryptoShim.ts",
+      "default": "./src/nodeCryptoShim.ts"
+    }
+  },
+  "scripts": {
+    "build": "tsc --noEmit",
+    "test": "pnpm run build && node --experimental-strip-types --test src/**/*.test.ts"
+  },
+  "dependencies": {
+    "@ledgerhq/hw-app-btc": "^11.0.0",
+    "@ledgerhq/hw-transport-webhid": "^6.35.2",
+    "@noble/ciphers": "^2.0.1",
+    "@noble/curves": "^2.2.0",
+    "@noble/hashes": "^2.2.0",
+    "@trezor/connect-web": "^9.7.3",
+    "bech32": "^2.0.0",
+    "bitcoinjs-lib": "^6.1.7",
+    "buffer": "^6.0.3"
+  },
+  "devDependencies": {
+    "@types/node": "^24.2.1",
+    "typescript": "^5.9.2"
+  }
+}
