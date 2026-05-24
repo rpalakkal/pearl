@@ -3,7 +3,7 @@ import {
   MAX_HARDWARE_WALLET_ADDRESS_INDEX,
   networkConfig,
 } from './constants.ts';
-import type { HardwareWalletVendor, PearlNetwork } from './types.ts';
+import type {HardwareWalletVendor, PearlNetwork} from './types.ts';
 
 export function normalizePearlNetwork(network: string): PearlNetwork {
   return network === 'testnet' ? 'testnet' : 'mainnet';
@@ -32,16 +32,17 @@ export function getPearlHardwareWalletAccountPath(
 }
 
 export function normalizeHardwareWalletAddressIndex(addressIndex: unknown): number {
-  const value = typeof addressIndex === 'string'
-    ? Number(addressIndex.trim())
-    : Number(addressIndex);
+  const value =
+    typeof addressIndex === 'string' ? Number(addressIndex.trim()) : Number(addressIndex);
 
   if (
     !Number.isSafeInteger(value) ||
     value < DEFAULT_HARDWARE_WALLET_ADDRESS_INDEX ||
     value > MAX_HARDWARE_WALLET_ADDRESS_INDEX
   ) {
-    throw new Error(`Hardware wallet address index must be between ${DEFAULT_HARDWARE_WALLET_ADDRESS_INDEX} and ${MAX_HARDWARE_WALLET_ADDRESS_INDEX}.`);
+    throw new Error(
+      `Hardware wallet address index must be between ${DEFAULT_HARDWARE_WALLET_ADDRESS_INDEX} and ${MAX_HARDWARE_WALLET_ADDRESS_INDEX}.`
+    );
   }
 
   return value;

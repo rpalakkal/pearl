@@ -1,4 +1,4 @@
-import { schnorr } from '@noble/curves/secp256k1.js';
+import {schnorr} from '@noble/curves/secp256k1.js';
 import {
   FEE_RATE_EPSILON,
   HARDWARE_TRANSACTION_LOCKTIME,
@@ -8,7 +8,7 @@ import {
   SATS_PER_PEARL,
   TAPROOT_DUST_SATS,
 } from './constants.ts';
-import { bigintToSafeNumber, parseSatsValue } from './amounts.ts';
+import {bigintToSafeNumber, parseSatsValue} from './amounts.ts';
 import {
   buffersEqual,
   bytesToHex,
@@ -19,9 +19,9 @@ import {
   pearlTaprootScriptFromAddress,
   xOnlyPublicKeyFromHex,
 } from './address.ts';
-import { validateHardwareWalletAccount } from './account.ts';
-import { ensureHardwareWalletBuffer, loadBitcoinJs } from './browser.ts';
-import { getAccountPathFromAddressPath, getTrezorCoin, parseBip32Path } from './paths.ts';
+import {validateHardwareWalletAccount} from './account.ts';
+import {ensureHardwareWalletBuffer, loadBitcoinJs} from './browser.ts';
+import {getAccountPathFromAddressPath, getTrezorCoin, parseBip32Path} from './paths.ts';
 import type {
   HardwarePearlSendPlan,
   HardwarePearlSendPreview,
@@ -37,10 +37,12 @@ interface ExpectedTransactionOutput {
   valueSats: bigint;
 }
 
-export function previewHardwarePearlSend(request: HardwarePearlSendRequest): HardwarePearlSendPreview {
+export function previewHardwarePearlSend(
+  request: HardwarePearlSendRequest
+): HardwarePearlSendPreview {
   validateHardwareWalletAccount(request.account);
   pearlTaprootOutputKeyFromAddress(request.destinationAddress, request.account.network);
-  const { selectedUtxos, feeSats, changeSats } = selectUtxosForSend(
+  const {selectedUtxos, feeSats, changeSats} = selectUtxosForSend(
     request.utxos,
     request.amountSats,
     request.feeRatePrlPerKb
@@ -82,14 +84,14 @@ export async function buildPearlSendPlan(
     request.destinationAddress,
     request.account.network
   );
-  const { selectedUtxos, feeSats, changeSats } = selectUtxosForSend(
+  const {selectedUtxos, feeSats, changeSats} = selectUtxosForSend(
     request.utxos,
     request.amountSats,
     request.feeRatePrlPerKb
   );
   const Buffer = await ensureHardwareWalletBuffer();
   const bitcoin = await loadBitcoinJs();
-  const psbt = new bitcoin.Psbt({ network: bitcoin.networks.bitcoin });
+  const psbt = new bitcoin.Psbt({network: bitcoin.networks.bitcoin});
   psbt.setVersion(HARDWARE_TRANSACTION_VERSION);
   psbt.setLocktime(HARDWARE_TRANSACTION_LOCKTIME);
   const internalPubkey = xOnlyPublicKeyFromHex(request.account.publicKey);
@@ -180,16 +182,21 @@ export function buildTrezorSignTransactionPayload(
     })),
     outputs: [
       {
-        address: getBitcoinDeviceDisplayAddress(request.destinationAddress, request.account.network),
+        address: getBitcoinDeviceDisplayAddress(
+          request.destinationAddress,
+          request.account.network
+        ),
         amount: request.amountSats.toString(),
         script_type: 'PAYTOADDRESS',
       },
       ...(plan.changeSats > 0n
-        ? [{
-            address_n: addressPath,
-            amount: plan.changeSats.toString(),
-            script_type: 'PAYTOTAPROOT' as const,
-          }]
+        ? [
+            {
+              address_n: addressPath,
+              amount: plan.changeSats.toString(),
+              script_type: 'PAYTOTAPROOT' as const,
+            },
+          ]
         : []),
     ],
   };
@@ -269,9 +276,10 @@ export async function validateSignedHardwareTransaction(
   const unmatchedOutputs = [...transaction.outs];
 
   for (const expectedOutput of expectedOutputs) {
-    const outputIndex = unmatchedOutputs.findIndex(output =>
-      BigInt(output.value) === expectedOutput.valueSats &&
-      buffersEqual(output.script, expectedOutput.script)
+    const outputIndex = unmatchedOutputs.findIndex(
+      output =>
+        BigInt(output.value) === expectedOutput.valueSats &&
+        buffersEqual(output.script, expectedOutput.script)
     );
 
     if (outputIndex === -1) {
@@ -285,10 +293,7 @@ export async function validateSignedHardwareTransaction(
     (total, utxo) => total + parseUtxoValue(utxo),
     0n
   );
-  const outputSats = transaction.outs.reduce(
-    (total, output) => total + BigInt(output.value),
-    0n
-  );
+  const outputSats = transaction.outs.reduce((total, output) => total + BigInt(output.value), 0n);
 
   if (selectedInputSats - outputSats !== plan.feeSats) {
     throw new Error('Signed transaction fee does not match the send plan.');
@@ -318,9 +323,8 @@ export async function validateSignedHardwareTransaction(
       throw new Error('Signed transaction contains an invalid Taproot signature hash type.');
     }
 
-    const sighashType = signature.length === 65
-      ? signature[64]
-      : bitcoin.Transaction.SIGHASH_DEFAULT;
+    const sighashType =
+      signature.length === 65 ? signature[64] : bitcoin.Transaction.SIGHASH_DEFAULT;
 
     if (
       sighashType !== bitcoin.Transaction.SIGHASH_DEFAULT &&
@@ -329,12 +333,7 @@ export async function validateSignedHardwareTransaction(
       throw new Error('Signed transaction uses an unsupported Taproot signature hash type.');
     }
 
-    const sighash = transaction.hashForWitnessV1(
-      index,
-      prevOutScripts,
-      prevOutValues,
-      sighashType
-    );
+    const sighash = transaction.hashForWitnessV1(index, prevOutScripts, prevOutValues, sighashType);
 
     let signatureMatches = false;
 
@@ -374,7 +373,7 @@ function selectUtxosForSend(
   utxos: HardwareWalletUtxo[],
   amountSats: bigint,
   feeRatePrlPerKb: number
-): { selectedUtxos: HardwareWalletUtxo[]; feeSats: bigint; changeSats: bigint } {
+): {selectedUtxos: HardwareWalletUtxo[]; feeSats: bigint; changeSats: bigint} {
   if (amountSats <= 0n) {
     throw new Error('Enter an amount greater than 0 PRL.');
   }
@@ -391,18 +390,18 @@ function selectUtxosForSend(
     };
   });
   const pendingValueSats = normalizedUtxos
-    .filter(({ utxo, valueSats }) => valueSats > 0n && !isConfirmedHardwareUtxo(utxo))
-    .reduce((total, { valueSats }) => total + valueSats, 0n);
+    .filter(({utxo, valueSats}) => valueSats > 0n && !isConfirmedHardwareUtxo(utxo))
+    .reduce((total, {valueSats}) => total + valueSats, 0n);
   const sortedUtxos = normalizedUtxos
-    .filter(({ valueSats }) => valueSats > 0n)
-    .filter(({ utxo }) => isConfirmedHardwareUtxo(utxo))
+    .filter(({valueSats}) => valueSats > 0n)
+    .filter(({utxo}) => isConfirmedHardwareUtxo(utxo))
     .sort((a, b) => {
       return b.valueSats > a.valueSats ? 1 : b.valueSats < a.valueSats ? -1 : 0;
     });
   const selectedUtxos: HardwareWalletUtxo[] = [];
   let selectedValue = 0n;
 
-  for (const { utxo, valueSats } of sortedUtxos) {
+  for (const {utxo, valueSats} of sortedUtxos) {
     selectedUtxos.push(utxo);
     selectedValue += valueSats;
 
@@ -439,13 +438,17 @@ function selectUtxosForSend(
   throw new Error('Insufficient hardware wallet balance for amount plus network fee.');
 }
 
-function estimateTaprootFeeSats(inputCount: number, outputCount: number, feeRatePrlPerKb: number): bigint {
+function estimateTaprootFeeSats(
+  inputCount: number,
+  outputCount: number,
+  feeRatePrlPerKb: number
+): bigint {
   const estimatedFeeRate = (feeRatePrlPerKb * Number(SATS_PER_PEARL)) / 1000;
   const feeRateSatsPerVbyte = Math.max(
     MIN_FEE_RATE_SATS_PER_VBYTE,
     Math.ceil(estimatedFeeRate - FEE_RATE_EPSILON)
   );
-  const estimatedVbytes = 10 + (inputCount * 58) + (outputCount * 43);
+  const estimatedVbytes = 10 + inputCount * 58 + outputCount * 43;
   return BigInt(estimatedVbytes * feeRateSatsPerVbyte);
 }
 

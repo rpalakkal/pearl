@@ -1,10 +1,15 @@
-import { derivePearlTaprootAddress } from './hardware-wallet/address.ts';
-import { validateHardwareWalletAccount } from './hardware-wallet/account.ts';
+import {derivePearlTaprootAddress} from './hardware-wallet/address.ts';
+import {validateHardwareWalletAccount} from './hardware-wallet/account.ts';
+import {DEFAULT_HARDWARE_WALLET_ADDRESS_INDEX} from './hardware-wallet/constants.ts';
 import {
-  DEFAULT_HARDWARE_WALLET_ADDRESS_INDEX,
-} from './hardware-wallet/constants.ts';
-import { getLedgerPublicKey, signLedgerPearlTransaction, verifyLedgerWalletAddress } from './hardware-wallet/ledger.ts';
-import { getPearlHardwareWalletPath, normalizeHardwareWalletAddressIndex } from './hardware-wallet/paths.ts';
+  getLedgerPublicKey,
+  signLedgerPearlTransaction,
+  verifyLedgerWalletAddress,
+} from './hardware-wallet/ledger.ts';
+import {
+  getPearlHardwareWalletPath,
+  normalizeHardwareWalletAddressIndex,
+} from './hardware-wallet/paths.ts';
 import {
   getTrezorPublicKey,
   signTrezorPearlTransaction,
@@ -23,8 +28,8 @@ export {
   DEFAULT_HARDWARE_WALLET_ADDRESS_INDEX,
   MAX_HARDWARE_WALLET_ADDRESS_INDEX,
 } from './hardware-wallet/constants.ts';
-export { preloadHardwareWalletSupport } from './hardware-wallet/browser.ts';
-export { parsePearlAmountToSats, formatSatsAsPearl } from './hardware-wallet/amounts.ts';
+export {preloadHardwareWalletSupport} from './hardware-wallet/browser.ts';
+export {parsePearlAmountToSats, formatSatsAsPearl} from './hardware-wallet/amounts.ts';
 export {
   derivePearlTaprootAddress,
   getBitcoinDeviceDisplayAddress,
@@ -35,8 +40,11 @@ export {
   validateHardwareWalletAccount,
   validateHardwareWalletDeviceAccount,
 } from './hardware-wallet/account.ts';
-export { getHardwareWalletErrorMessage, isLedgerUnsupportedTaprootAddressError } from './hardware-wallet/errors.ts';
-export { readLedgerTaprootWalletPublicKey } from './hardware-wallet/ledger.ts';
+export {
+  getHardwareWalletErrorMessage,
+  isLedgerUnsupportedTaprootAddressError,
+} from './hardware-wallet/errors.ts';
+export {readLedgerTaprootWalletPublicKey} from './hardware-wallet/ledger.ts';
 export {
   getHardwareWalletAddressIndexFromPath,
   getPearlBip86Path,
@@ -75,9 +83,10 @@ export async function connectHardwareWallet(
 ): Promise<HardwareWalletAddress> {
   const normalizedAddressIndex = normalizeHardwareWalletAddressIndex(addressIndex);
   const path = getPearlHardwareWalletPath(network, vendor, normalizedAddressIndex);
-  const publicKey = vendor === 'ledger'
-    ? await getLedgerPublicKey(path, network)
-    : await getTrezorPublicKey(path, network);
+  const publicKey =
+    vendor === 'ledger'
+      ? await getLedgerPublicKey(path, network)
+      : await getTrezorPublicKey(path, network);
 
   return {
     vendor,

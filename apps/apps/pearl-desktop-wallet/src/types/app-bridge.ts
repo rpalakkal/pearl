@@ -6,12 +6,12 @@ import {
   SaveDialogOptions,
   SaveDialogReturnValue,
 } from 'electron';
-import type { Transaction } from './transaction';
+import type {Transaction} from './transaction';
 
 type PromisifyInterface<T> = {
   [K in keyof T]: T[K] extends (...args: infer A) => infer R
-  ? (...args: A) => Promise<Awaited<R>>
-  : never;
+    ? (...args: A) => Promise<Awaited<R>>
+    : never;
 };
 
 type Ipc<T> = PromisifyInterface<T>;
@@ -48,7 +48,7 @@ interface WalletApi {
 
   getBalance: (account?: string, minconf?: number) => Promise<number>;
 
-  validateAddress: (address: string) => Promise<{ isValid: boolean }>;
+  validateAddress: (address: string) => Promise<{isValid: boolean}>;
 
   estimateFee: (numBlocks: number, network?: AppNetwork) => Promise<number>;
 }
@@ -90,21 +90,23 @@ interface HardwareWalletBroadcastResult {
 interface HardwareWalletApi {
   getBalance: (address: string, network?: AppNetwork) => Promise<HardwareWalletBalance>;
 
-  broadcastTransaction: (request: HardwareWalletBroadcastRequest) => Promise<HardwareWalletBroadcastResult>;
+  broadcastTransaction: (
+    request: HardwareWalletBroadcastRequest
+  ) => Promise<HardwareWalletBroadcastResult>;
 }
 
 interface ManagerApi {
-  getWalletsStats: () => { name?: string };
+  getWalletsStats: () => {name?: string};
 
   selectWallet: (walletName: string) => Promise<void>;
 
-  create: (options: { name: string; password: string }) => Promise<{ seed: string }>;
+  create: (options: {name: string; password: string}) => Promise<{seed: string}>;
 
   import: (options: {
     name: string;
     seed: string;
     password?: string;
-  }) => Promise<{ name: string; seed: string }>;
+  }) => Promise<{name: string; seed: string}>;
 
   getExistingWallets: () => Promise<{
     walletNames: string[];
@@ -122,7 +124,7 @@ interface ManagerApi {
     };
   }>;
 
-  setNetwork: (network: string) => Promise<{ success: boolean; network: string }>;
+  setNetwork: (network: string) => Promise<{success: boolean; network: string}>;
 
   getPeerSettings: () => Promise<{
     network: string;
@@ -133,11 +135,11 @@ interface ManagerApi {
     isCustom: boolean;
   }>;
 
-  validatePeerAddress: (address: string, port: number) => Promise<{ valid: boolean; error?: string }>;
+  validatePeerAddress: (address: string, port: number) => Promise<{valid: boolean; error?: string}>;
 
-  setCustomPeerAddress: (address: string, port: number) => Promise<{ success: boolean }>;
+  setCustomPeerAddress: (address: string, port: number) => Promise<{success: boolean}>;
 
-  resetPeerToDefault: () => Promise<{ success: boolean }>;
+  resetPeerToDefault: () => Promise<{success: boolean}>;
 }
 
 type UpdateSeverity = 'none' | 'patch' | 'minor' | 'major';
@@ -182,15 +184,15 @@ interface SyncApi {
 
   waitForSync: () => Promise<
     | {
-      success: true;
-      synced: boolean;
-      error?: undefined;
-    }
+        success: true;
+        synced: boolean;
+        error?: undefined;
+      }
     | {
-      success: true;
-      synced: boolean;
-      error: string;
-    }
+        success: true;
+        synced: boolean;
+        error: string;
+      }
   >;
 }
 
@@ -203,4 +205,23 @@ interface AppBridge {
   update: UpdateApi;
 }
 
-export type { AppBridge, WindowApi, WalletApi, HardwareWalletApi, HardwareWalletBalance, HardwareWalletBroadcastRequest, HardwareWalletBroadcastResult, ManagerApi, SyncApi, SyncProgress, SyncPhase, UpdateApi, UpdateStatus, UpdateSeverity, BlockbookAddressInfo, BlockbookUtxo, AppNetwork, Ipc };
+export type {
+  AppBridge,
+  WindowApi,
+  WalletApi,
+  HardwareWalletApi,
+  HardwareWalletBalance,
+  HardwareWalletBroadcastRequest,
+  HardwareWalletBroadcastResult,
+  ManagerApi,
+  SyncApi,
+  SyncProgress,
+  SyncPhase,
+  UpdateApi,
+  UpdateStatus,
+  UpdateSeverity,
+  BlockbookAddressInfo,
+  BlockbookUtxo,
+  AppNetwork,
+  Ipc,
+};

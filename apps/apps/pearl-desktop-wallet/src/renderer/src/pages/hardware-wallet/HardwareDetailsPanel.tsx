@@ -1,5 +1,5 @@
-import { Button } from '@/components/ui/button';
-import type { HardwareWalletDetailsModel, HardwareWalletViewActions } from './viewModel.ts';
+import {Button} from '@/components/ui/button';
+import type {HardwareWalletDetailsModel, HardwareWalletViewActions} from './viewModel.ts';
 
 export function HardwareDetailsPanel({
   actions,
@@ -15,7 +15,11 @@ export function HardwareDetailsPanel({
       <div className="grid gap-3 text-sm sm:grid-cols-2">
         <HardwareDetail
           label="Provider"
-          value={model.isRememberedAccount ? `${model.connectedLabel} (remembered)` : model.connectedLabel}
+          value={
+            model.isRememberedAccount
+              ? `${model.connectedLabel} (remembered)`
+              : model.connectedLabel
+          }
         />
         <HardwareDetail label="Network" value={model.hardwareAddress.network} />
         <HardwareDetail label="Address Index" value={String(model.hardwareAddress.addressIndex)} />
@@ -25,8 +29,8 @@ export function HardwareDetailsPanel({
 
       {model.isRememberedAccount && (
         <div className="rounded-lg border border-blue-200 bg-blue-50 p-3 text-sm text-blue-900">
-          This hardware account was restored from this computer. The device is still required
-          for address verification and signing.
+          This hardware account was restored from this computer. The device is still required for
+          address verification and signing.
         </div>
       )}
 
@@ -43,7 +47,7 @@ export function HardwareDetailsPanel({
   );
 }
 
-function HardwareDetail({ label, value }: { label: string; value: string }) {
+function HardwareDetail({label, value}: {label: string; value: string}) {
   return (
     <div className="min-w-0 rounded-lg border border-gray-200 bg-gray-50 p-3">
       <div className="mb-1 text-xs font-medium uppercase text-gray-500">{label}</div>

@@ -45,10 +45,7 @@ export function getHardwareAddressSelectorOptions(
     accountsByIndex.set(activeAccount.addressIndex, activeAccount);
   }
 
-  const indexes = new Set([
-    ...accountsByIndex.keys(),
-    selectedAddressIndex,
-  ]);
+  const indexes = new Set([...accountsByIndex.keys(), selectedAddressIndex]);
 
   return [...indexes]
     .sort((left, right) => left - right)
@@ -58,7 +55,9 @@ export function getHardwareAddressSelectorOptions(
     }));
 }
 
-export function getNextHardwareWalletAddressIndex(accounts: HardwareWalletAddress[]): number | null {
+export function getNextHardwareWalletAddressIndex(
+  accounts: HardwareWalletAddress[]
+): number | null {
   const usedIndexes = new Set(accounts.map(account => account.addressIndex));
   const highestUsedIndex = accounts.reduce(
     (highest, account) => Math.max(highest, account.addressIndex),
@@ -165,19 +164,16 @@ export function readStoredHardwareAccount(
       return null;
     }
 
-    const storedAddressIndex = addressIndex ?? readLastHardwareWalletAddressIndex(
-      network,
-      storedVendor,
-      storage
-    );
+    const storedAddressIndex =
+      addressIndex ?? readLastHardwareWalletAddressIndex(network, storedVendor, storage);
     const normalizedAddressIndex = normalizeHardwareWalletAddressIndex(storedAddressIndex);
     const rawAccount =
-      storage.getItem(storageKeyForHardwareAccount(network, storedVendor, normalizedAddressIndex)) ??
-      (
-        normalizedAddressIndex === DEFAULT_HARDWARE_WALLET_ADDRESS_INDEX
-          ? storage.getItem(legacyStorageKeyForHardwareAccount(network, storedVendor))
-          : null
-      );
+      storage.getItem(
+        storageKeyForHardwareAccount(network, storedVendor, normalizedAddressIndex)
+      ) ??
+      (normalizedAddressIndex === DEFAULT_HARDWARE_WALLET_ADDRESS_INDEX
+        ? storage.getItem(legacyStorageKeyForHardwareAccount(network, storedVendor))
+        : null);
 
     if (!rawAccount) {
       return null;
@@ -237,11 +233,10 @@ export function forgetStoredHardwareAccount(
 
     const lastVendor = storage.getItem(lastVendorStorageKey(network));
     const lastAddressIndex = storage.getItem(lastAddressIndexStorageKey(network, vendor));
-    const isLastAddressIndex = lastAddressIndex === String(normalizedAddressIndex) ||
-      (
-        lastAddressIndex === null &&
-        normalizedAddressIndex === DEFAULT_HARDWARE_WALLET_ADDRESS_INDEX
-      );
+    const isLastAddressIndex =
+      lastAddressIndex === String(normalizedAddressIndex) ||
+      (lastAddressIndex === null &&
+        normalizedAddressIndex === DEFAULT_HARDWARE_WALLET_ADDRESS_INDEX);
 
     if (isLastAddressIndex) {
       storage.removeItem(lastAddressIndexStorageKey(network, vendor));
@@ -315,8 +310,7 @@ function parseStoredHardwareAccount(
 
   try {
     addressIndex = normalizeHardwareWalletAddressIndex(
-      account.addressIndex ??
-      getHardwareWalletAddressIndexFromPath(account.path, network, vendor)
+      account.addressIndex ?? getHardwareWalletAddressIndexFromPath(account.path, network, vendor)
     );
   } catch {
     return null;

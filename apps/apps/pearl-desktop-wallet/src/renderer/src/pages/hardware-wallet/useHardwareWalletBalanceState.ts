@@ -1,13 +1,13 @@
-import { useRef, useState } from 'react';
-import type { HardwareWalletAddress, PearlNetwork } from '../../lib/hardwareWallet.ts';
-import type { BlockbookAddressInfo, BlockbookUtxo } from '../../../../types/app-bridge.ts';
+import {useRef, useState} from 'react';
+import type {HardwareWalletAddress, PearlNetwork} from '../../lib/hardwareWallet.ts';
+import type {BlockbookAddressInfo, BlockbookUtxo} from '../../../../types/app-bridge.ts';
 import {
   getErrorLogMessage,
   hardwareAccountLogContext,
   hardwareBalanceLogContext,
   logHardwareWalletEvent,
 } from './pageModel.ts';
-import type { HardwareWalletBalanceData } from './balanceData.ts';
+import type {HardwareWalletBalanceData} from './balanceData.ts';
 
 type FetchHardwareWalletBalanceData = (
   address: string,
@@ -21,7 +21,7 @@ export function useHardwareWalletBalanceState(fetchBalanceData: FetchHardwareWal
   const [isLoadingBalance, setIsLoadingBalance] = useState(false);
   const [utxos, setUtxos] = useState<BlockbookUtxo[]>([]);
 
-  const setHardwareBalanceData = ({ info, utxos: addressUtxos }: HardwareWalletBalanceData) => {
+  const setHardwareBalanceData = ({info, utxos: addressUtxos}: HardwareWalletBalanceData) => {
     setAddressInfo(info);
     setUtxos(addressUtxos);
   };
@@ -61,11 +61,17 @@ export function useHardwareWalletBalanceState(fetchBalanceData: FetchHardwareWal
       }
 
       console.error('Failed to load hardware wallet balance:', error);
-      logHardwareWalletEvent('balance:error', {
-        ...hardwareAccountLogContext(account),
-        error: getErrorLogMessage(error),
-      }, 'error');
-      setBalanceError(error instanceof Error ? error.message : 'Unable to load hardware wallet balance.');
+      logHardwareWalletEvent(
+        'balance:error',
+        {
+          ...hardwareAccountLogContext(account),
+          error: getErrorLogMessage(error),
+        },
+        'error'
+      );
+      setBalanceError(
+        error instanceof Error ? error.message : 'Unable to load hardware wallet balance.'
+      );
     } finally {
       if (requestId === balanceRequestIdRef.current) {
         setIsLoadingBalance(false);

@@ -1,8 +1,8 @@
-import { BrowserWindow, shell } from 'electron';
-import { join } from 'path';
-import { is } from '@electron-toolkit/utils';
-import { isTrezorConnectUrl } from './hardware-wallet-permissions';
-import { configureHardwareWalletPermissions } from './hardware-wallet-session.ts';
+import {BrowserWindow, shell} from 'electron';
+import {join} from 'path';
+import {is} from '@electron-toolkit/utils';
+import {isTrezorConnectUrl} from './hardware-wallet-permissions';
+import {configureHardwareWalletPermissions} from './hardware-wallet-session.ts';
 
 const hardwareWalletRendererLogPrefix = '[HardwareWallet]';
 
@@ -32,7 +32,9 @@ function createMainWindow(): BrowserWindow {
 
   mainWindow.webContents.setWindowOpenHandler(details => {
     if (isTrezorConnectUrl(details.url)) {
-      console.info(`[HardwareWallet] Trezor Connect popup allowed url=${compactLogUrl(details.url)}`);
+      console.info(
+        `[HardwareWallet] Trezor Connect popup allowed url=${compactLogUrl(details.url)}`
+      );
       return {
         action: 'allow',
         overrideBrowserWindowOptions: {
@@ -61,7 +63,7 @@ function createMainWindow(): BrowserWindow {
     }
 
     shell.openExternal(details.url);
-    return { action: 'deny' };
+    return {action: 'deny'};
   });
 
   mainWindow.webContents.on('did-create-window', (childWindow, details) => {
@@ -154,4 +156,4 @@ function compactLogUrl(url: string): string {
   }
 }
 
-export { createMainWindow };
+export {createMainWindow};

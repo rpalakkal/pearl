@@ -1,8 +1,8 @@
-import { ArrowLeft, ArrowUpRight, ArrowDownLeft, Copy, Check } from 'lucide-react';
-import { Transaction } from '../../../types/transaction';
-import { usePagination } from '../hooks/usePagination';
-import { Button } from '@/components/ui/button';
-import { useState } from 'react';
+import {ArrowLeft, ArrowUpRight, ArrowDownLeft, Copy, Check} from 'lucide-react';
+import {Transaction} from '../../../types/transaction';
+import {usePagination} from '../hooks/usePagination';
+import {Button} from '@/components/ui/button';
+import {useState} from 'react';
 
 interface ActivityPageProps {
   onBack: () => void;
@@ -35,8 +35,8 @@ const truncateTxId = (txid: string): string => {
   return `${txid.slice(0, 8)}...${txid.slice(-8)}`;
 };
 
-export default function ActivityPage({ onBack }: ActivityPageProps) {
-  const { activities, loading, hasMore, loadMore } = usePagination({
+export default function ActivityPage({onBack}: ActivityPageProps) {
+  const {activities, loading, hasMore, loadMore} = usePagination({
     pageSize: 10,
   });
   const [copiedTxId, setCopiedTxId] = useState<string | null>(null);
@@ -115,8 +115,9 @@ export default function ActivityPage({ onBack }: ActivityPageProps) {
                   </div>
                   <div className="text-right">
                     <div
-                      className={`text-lg font-bold ${activity.type === 'received' ? 'text-green-700' : 'text-red-500'
-                        }`}
+                      className={`text-lg font-bold ${
+                        activity.type === 'received' ? 'text-green-700' : 'text-red-500'
+                      }`}
                     >
                       {activity.type === 'received' ? '+' : '-'}
                       {activity.amount} PRL

@@ -4,11 +4,7 @@
   "directories": {
     "output": "dist"
   },
-  "files": [
-    "out/**/*",
-    "resources/**/*",
-    "package.json"
-  ],
+  "files": ["out/**/*", "resources/**/*", "package.json"],
   "asar": true,
   "npmRebuild": false,
   "icon": "resources/icon.png",
@@ -26,19 +22,14 @@
     "target": [
       {
         "target": "dmg",
-        "arch": [
-          "x64",
-          "arm64"
-        ]
+        "arch": ["x64", "arm64"]
       }
     ],
     "extraResources": [
       {
         "from": "bin/oyster-darwin-${arch}",
         "to": "bin/oyster-darwin-${arch}",
-        "filter": [
-          "**/*"
-        ]
+        "filter": ["**/*"]
       }
     ]
   },
@@ -47,18 +38,14 @@
     "target": [
       {
         "target": "nsis",
-        "arch": [
-          "x64"
-        ]
+        "arch": ["x64"]
       }
     ],
     "extraResources": [
       {
         "from": "bin/oyster-windows-${arch}.exe",
         "to": "bin/oyster-windows-${arch}.exe",
-        "filter": [
-          "**/*"
-        ]
+        "filter": ["**/*"]
       }
     ]
   },
@@ -67,18 +54,14 @@
     "target": [
       {
         "target": "deb",
-        "arch": [
-          "x64"
-        ]
+        "arch": ["x64"]
       }
     ],
     "extraResources": [
       {
         "from": "bin/oyster-linux-${arch}",
         "to": "bin/oyster-linux-${arch}",
-        "filter": [
-          "**/*"
-        ]
+        "filter": ["**/*"]
       }
     ],
     "category": "Office",
@@ -99,9 +82,7 @@
       "libuuid1",
       "libsecret-1-0"
     ],
-    "recommends": [
-      "libappindicator3-1"
-    ],
+    "recommends": ["libappindicator3-1"],
     "compression": "xz"
   },
   "nsis": {

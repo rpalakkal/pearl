@@ -1,4 +1,4 @@
-import { AlertTriangle } from 'lucide-react';
+import {AlertTriangle} from 'lucide-react';
 
 export function HardwareWalletInfoNotice() {
   return (
@@ -6,9 +6,9 @@ export function HardwareWalletInfoNotice() {
       <div className="flex gap-3">
         <AlertTriangle className="mt-0.5 h-4 w-4 flex-shrink-0 text-amber-600" />
         <p>
-          Hardware wallet funds are shown separately from the local wallet balance.
-          Ledger uses the Bitcoin app, and Trezor uses Bitcoin signing. Either device may show
-          the equivalent Bitcoin-format address during confirmation.
+          Hardware wallet funds are shown separately from the local wallet balance. Ledger uses the
+          Bitcoin app, and Trezor uses Bitcoin signing. Either device may show the equivalent
+          Bitcoin-format address during confirmation.
         </p>
       </div>
     </div>

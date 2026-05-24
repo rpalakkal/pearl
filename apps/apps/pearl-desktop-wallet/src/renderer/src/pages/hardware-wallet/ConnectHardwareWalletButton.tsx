@@ -1,5 +1,5 @@
-import { Loader2 } from 'lucide-react';
-import { Button } from '@/components/ui/button';
+import {Loader2} from 'lucide-react';
+import {Button} from '@/components/ui/button';
 import type {
   HardwareWalletConnectionModel,
   HardwareWalletVendorModel,
@@ -15,9 +15,9 @@ export function ConnectHardwareWalletButton({
   connection: HardwareWalletConnectionModel;
   vendor: HardwareWalletVendorModel;
 }) {
-  const SelectedVendorIcon = vendor.vendors.find(
-    option => option.vendor === vendor.selectedVendor
-  )?.icon ?? vendor.vendors[0].icon;
+  const SelectedVendorIcon =
+    vendor.vendors.find(option => option.vendor === vendor.selectedVendor)?.icon ??
+    vendor.vendors[0].icon;
 
   return (
     <Button

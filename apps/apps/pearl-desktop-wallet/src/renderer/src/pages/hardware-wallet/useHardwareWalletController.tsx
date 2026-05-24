@@ -1,6 +1,6 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
-import { HardDrive, Usb } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
+import {useEffect, useMemo, useRef, useState} from 'react';
+import {HardDrive, Usb} from 'lucide-react';
+import {useNavigate} from 'react-router-dom';
 import {
   connectHardwareWallet,
   DEFAULT_HARDWARE_WALLET_ADDRESS_INDEX,
@@ -49,11 +49,11 @@ import {
   PENDING_OUTGOING_HARDWARE_SEND_MESSAGE,
   sendHardwareTransactionWorkflow,
 } from './sendWorkflow.ts';
-import { useHardwareSendFormState } from './useHardwareSendFormState.ts';
-import { buildHardwareWalletViewProps } from './buildHardwareWalletViewProps.ts';
-import { useHardwareWalletBalanceState } from './useHardwareWalletBalanceState.ts';
-import { useHardwareWalletOperationState } from './useHardwareWalletOperationState.ts';
-import type { HardwareWalletBalanceData } from './balanceData.ts';
+import {useHardwareSendFormState} from './useHardwareSendFormState.ts';
+import {buildHardwareWalletViewProps} from './buildHardwareWalletViewProps.ts';
+import {useHardwareWalletBalanceState} from './useHardwareWalletBalanceState.ts';
+import {useHardwareWalletOperationState} from './useHardwareWalletOperationState.ts';
+import type {HardwareWalletBalanceData} from './balanceData.ts';
 
 interface NetworkInfo {
   currentNetwork: string;
@@ -63,8 +63,8 @@ interface NetworkInfo {
 }
 
 const vendors: HardwareWalletVendorOption[] = [
-  { vendor: 'ledger', label: 'Ledger', icon: Usb },
-  { vendor: 'trezor', label: 'Trezor', icon: HardDrive },
+  {vendor: 'ledger', label: 'Ledger', icon: Usb},
+  {vendor: 'trezor', label: 'Trezor', icon: HardDrive},
 ];
 
 export function useHardwareWalletController(): HardwareWalletViewProps {
@@ -72,7 +72,9 @@ export function useHardwareWalletController(): HardwareWalletViewProps {
   const activeHardwareAccountKeyRef = useRef<string | null>(null);
   const hasRestoredInitialHardwareAccountRef = useRef(false);
   const [selectedVendor, setSelectedVendor] = useState<HardwareWalletVendor>('ledger');
-  const [selectedAddressIndex, setSelectedAddressIndex] = useState(DEFAULT_HARDWARE_WALLET_ADDRESS_INDEX);
+  const [selectedAddressIndex, setSelectedAddressIndex] = useState(
+    DEFAULT_HARDWARE_WALLET_ADDRESS_INDEX
+  );
   const [storedAccountsVersion, setStoredAccountsVersion] = useState(0);
   const [networkInfo, setNetworkInfo] = useState<NetworkInfo | null>(null);
   const [hardwareAddress, setHardwareAddress] = useState<HardwareWalletAddress | null>(null);
@@ -135,10 +137,15 @@ export function useHardwareWalletController(): HardwareWalletViewProps {
       pearlNetwork,
       selectedAddressIndex
     );
-  }, [hardwareAddress, pearlNetwork, rememberedHardwareAccounts, selectedAddressIndex, selectedVendor]);
-  const selectedAddressOption = addressSelectorOptions.find(
-    option => option.addressIndex === selectedAddressIndex
-  ) ?? null;
+  }, [
+    hardwareAddress,
+    pearlNetwork,
+    rememberedHardwareAccounts,
+    selectedAddressIndex,
+    selectedVendor,
+  ]);
+  const selectedAddressOption =
+    addressSelectorOptions.find(option => option.addressIndex === selectedAddressIndex) ?? null;
   const selectedAddressSummary = selectedAddressOption?.account
     ? compactHardwareAddress(selectedAddressOption.account.address)
     : 'Not connected';
@@ -148,7 +155,8 @@ export function useHardwareWalletController(): HardwareWalletViewProps {
   }, [rememberedHardwareAccounts]);
   const activeSendNetwork = hardwareAddress?.network ?? pearlNetwork;
   const selectedLabel = vendors.find(option => option.vendor === selectedVendor)?.label ?? 'Device';
-  const connectedLabel = vendors.find(option => option.vendor === hardwareAddress?.vendor)?.label ?? selectedLabel;
+  const connectedLabel =
+    vendors.find(option => option.vendor === hardwareAddress?.vendor)?.label ?? selectedLabel;
   const receiveDeviceDisplayAddress = useMemo(() => {
     if (!hardwareAddress) {
       return null;
@@ -202,11 +210,11 @@ export function useHardwareWalletController(): HardwareWalletViewProps {
   }, [activeSendNetwork, sendAddress]);
   const sendPreview = useMemo<SendPreviewState>(() => {
     if (!hardwareAddress || !sendAmount.trim() || !sendAddress.trim()) {
-      return { preview: null, error: null };
+      return {preview: null, error: null};
     }
 
     if (hasPendingOutgoingHardwareSpend) {
-      return { preview: null, error: PENDING_OUTGOING_HARDWARE_SEND_MESSAGE };
+      return {preview: null, error: PENDING_OUTGOING_HARDWARE_SEND_MESSAGE};
     }
 
     try {
@@ -255,7 +263,11 @@ export function useHardwareWalletController(): HardwareWalletViewProps {
 
   const activateHardwareAccount = (
     account: HardwareWalletAddress,
-    options: { rememberSelection?: boolean; selectAccount?: boolean; source: 'connected' | 'remembered' }
+    options: {
+      rememberSelection?: boolean;
+      selectAccount?: boolean;
+      source: 'connected' | 'remembered';
+    }
   ): Promise<void> => {
     if (options.selectAccount ?? true) {
       setSelectedVendor(account.vendor);
@@ -302,7 +314,9 @@ export function useHardwareWalletController(): HardwareWalletViewProps {
   };
 
   useEffect(() => {
-    activeHardwareAccountKeyRef.current = hardwareAddress ? hardwareAccountKey(hardwareAddress) : null;
+    activeHardwareAccountKeyRef.current = hardwareAddress
+      ? hardwareAccountKey(hardwareAddress)
+      : null;
   }, [hardwareAddress]);
 
   useEffect(() => {
@@ -328,7 +342,7 @@ export function useHardwareWalletController(): HardwareWalletViewProps {
         return;
       }
 
-      void activateHardwareAccount(rememberedAccount, { source: 'remembered' });
+      void activateHardwareAccount(rememberedAccount, {source: 'remembered'});
       return;
     }
 
@@ -347,7 +361,7 @@ export function useHardwareWalletController(): HardwareWalletViewProps {
       return;
     }
 
-    void activateHardwareAccount(rememberedAccount, { source: 'remembered' });
+    void activateHardwareAccount(rememberedAccount, {source: 'remembered'});
   }, [hardwareAddress, networkInfo, pearlNetwork, selectedAddressIndex, selectedVendor]);
 
   const loadNetworkInfo = async () => {
@@ -359,10 +373,10 @@ export function useHardwareWalletController(): HardwareWalletViewProps {
       });
     } catch (error) {
       console.error('Failed to load network info:', error);
-      logHardwareWalletEvent('network:fallback', { network: 'mainnet' }, 'warn');
+      logHardwareWalletEvent('network:fallback', {network: 'mainnet'}, 'warn');
       setNetworkInfo({
         currentNetwork: 'mainnet',
-        networkConfig: { displayName: 'Mainnet' },
+        networkConfig: {displayName: 'Mainnet'},
       });
     }
   };
@@ -386,14 +400,18 @@ export function useHardwareWalletController(): HardwareWalletViewProps {
       saveStoredHardwareAccount(address);
       refreshStoredHardwareAccounts();
       logHardwareWalletEvent('connect:success', hardwareAccountLogContext(address));
-      await activateHardwareAccount(address, { source: 'connected' });
+      await activateHardwareAccount(address, {source: 'connected'});
     } catch (error) {
       console.error('Failed to connect hardware wallet:', error);
-      logHardwareWalletEvent('connect:error', {
-        vendor,
-        network,
-        error: getErrorLogMessage(error),
-      }, 'error');
+      logHardwareWalletEvent(
+        'connect:error',
+        {
+          vendor,
+          network,
+          error: getErrorLogMessage(error),
+        },
+        'error'
+      );
       setErrorMessage(getHardwareWalletErrorMessage(error, vendor));
     } finally {
       finishConnecting();
@@ -463,10 +481,14 @@ export function useHardwareWalletController(): HardwareWalletViewProps {
       }
     } catch (error) {
       console.error('Failed to load hardware wallet fee rate:', error);
-      logHardwareWalletEvent('fee-rate:error', {
-        network,
-        error: getErrorLogMessage(error),
-      }, 'warn');
+      logHardwareWalletEvent(
+        'fee-rate:error',
+        {
+          network,
+          error: getErrorLogMessage(error),
+        },
+        'warn'
+      );
     }
   };
 
@@ -479,10 +501,9 @@ export function useHardwareWalletController(): HardwareWalletViewProps {
 
   const refreshFeeRateForSend = async (account: HardwareWalletAddress): Promise<number | null> => {
     try {
-      const estimatedFeeRate = Number(await window.appBridge.wallet.estimateFee(
-        1,
-        account.network
-      ));
+      const estimatedFeeRate = Number(
+        await window.appBridge.wallet.estimateFee(1, account.network)
+      );
 
       if (Number.isFinite(estimatedFeeRate) && estimatedFeeRate > 0) {
         logHardwareWalletEvent('send:fee-rate-refreshed', {
@@ -493,10 +514,14 @@ export function useHardwareWalletController(): HardwareWalletViewProps {
       }
     } catch (error) {
       console.error('Failed to refresh hardware wallet fee rate:', error);
-      logHardwareWalletEvent('send:fee-rate-refresh-error', {
-        ...hardwareAccountLogContext(account),
-        error: getErrorLogMessage(error),
-      }, 'warn');
+      logHardwareWalletEvent(
+        'send:fee-rate-refresh-error',
+        {
+          ...hardwareAccountLogContext(account),
+          error: getErrorLogMessage(error),
+        },
+        'warn'
+      );
     }
 
     return null;
@@ -563,10 +588,14 @@ export function useHardwareWalletController(): HardwareWalletViewProps {
       }
 
       console.error('Failed to verify hardware wallet address:', error);
-      logHardwareWalletEvent('verify:error', {
-        ...hardwareAccountLogContext(account),
-        error: getErrorLogMessage(error),
-      }, 'error');
+      logHardwareWalletEvent(
+        'verify:error',
+        {
+          ...hardwareAccountLogContext(account),
+          error: getErrorLogMessage(error),
+        },
+        'error'
+      );
       setVerifyError(getHardwareWalletErrorMessage(error, account.vendor));
     } finally {
       finishVerifyingAddress();
@@ -586,7 +615,8 @@ export function useHardwareWalletController(): HardwareWalletViewProps {
       await sendHardwareTransactionWorkflow({
         account,
         amountInput: sendAmount,
-        broadcastHardwareTransaction: request => window.appBridge.hardwareWallet.broadcastTransaction(request),
+        broadcastHardwareTransaction: request =>
+          window.appBridge.hardwareWallet.broadcastTransaction(request),
         estimateFeeRate: () => refreshFeeRateForSend(account),
         feeRatePrlPerKb: feeRate,
         fetchBalanceData: fetchHardwareWalletBalanceData,
@@ -609,17 +639,27 @@ export function useHardwareWalletController(): HardwareWalletViewProps {
 
   const actions: HardwareWalletViewActions = {
     addHardwareAddress,
-    connectDevice: () => { void connectDevice(); },
-    copyToClipboard: text => { void copyToClipboard(text); },
+    connectDevice: () => {
+      void connectDevice();
+    },
+    copyToClipboard: text => {
+      void copyToClipboard(text);
+    },
     forgetHardwareAccount,
     goBack,
-    loadHardwareWalletBalance: account => { void loadHardwareWalletBalance(account); },
+    loadHardwareWalletBalance: account => {
+      void loadHardwareWalletBalance(account);
+    },
     selectAddressIndex,
     selectVendor,
-    sendHardwareTransaction: () => { void sendHardwareTransaction(); },
+    sendHardwareTransaction: () => {
+      void sendHardwareTransaction();
+    },
     setSendAddress,
     setSendAmount,
-    verifyReceiveAddress: () => { void verifyReceiveAddress(); },
+    verifyReceiveAddress: () => {
+      void verifyReceiveAddress();
+    },
   };
 
   return buildHardwareWalletViewProps({

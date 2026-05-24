@@ -1,5 +1,9 @@
-import type { HardwareWalletAddress, HardwareWalletVendor, PearlNetwork } from '../../lib/hardwareWallet.ts';
-import type { HardwareAddressSelectorOption } from '../../lib/hardwareWalletStorage.ts';
+import type {
+  HardwareWalletAddress,
+  HardwareWalletVendor,
+  PearlNetwork,
+} from '../../lib/hardwareWallet.ts';
+import type {HardwareAddressSelectorOption} from '../../lib/hardwareWalletStorage.ts';
 import type {
   HardwareWalletVendorOption,
   HardwareWalletViewActions,
@@ -105,48 +109,48 @@ export function buildHardwareWalletViewProps({
       },
       connectedWallet: hardwareAddress
         ? {
-          balance: {
-            balanceError,
-            hardwareAddress,
-            hasPendingDeviceOperation,
-            isLoadingBalance,
-            pendingBalanceIsOutgoing,
-            pendingBalanceLabel,
-            pendingBalanceNotice,
-            pendingBalanceValue,
-            spendableBalanceSats,
-            spendableUtxoCount,
-          },
-          details: {
-            connectedLabel,
-            hardwareAddress,
-            isRememberedAccount,
-          },
-          receive: {
-            connectedLabel,
-            copiedAddress,
-            hardwareAddress,
-            hasPendingDeviceOperation,
-            isVerifyingAddress,
-            receiveDeviceDisplayAddress,
-            verifiedDeviceAddress,
-            verifyError,
-          },
-          send: {
-            activeSendNetwork,
-            connectedLabel,
-            deviceDisplayAddress,
-            feeRate,
-            hasPendingDeviceOperation,
-            isSending,
-            lastSendFee,
-            sendAddress,
-            sendAmount,
-            sendError,
-            sendPreview,
-            sendSuccess,
-          },
-        }
+            balance: {
+              balanceError,
+              hardwareAddress,
+              hasPendingDeviceOperation,
+              isLoadingBalance,
+              pendingBalanceIsOutgoing,
+              pendingBalanceLabel,
+              pendingBalanceNotice,
+              pendingBalanceValue,
+              spendableBalanceSats,
+              spendableUtxoCount,
+            },
+            details: {
+              connectedLabel,
+              hardwareAddress,
+              isRememberedAccount,
+            },
+            receive: {
+              connectedLabel,
+              copiedAddress,
+              hardwareAddress,
+              hasPendingDeviceOperation,
+              isVerifyingAddress,
+              receiveDeviceDisplayAddress,
+              verifiedDeviceAddress,
+              verifyError,
+            },
+            send: {
+              activeSendNetwork,
+              connectedLabel,
+              deviceDisplayAddress,
+              feeRate,
+              hasPendingDeviceOperation,
+              isSending,
+              lastSendFee,
+              sendAddress,
+              sendAmount,
+              sendError,
+              sendPreview,
+              sendSuccess,
+            },
+          }
         : null,
       connection: {
         errorMessage,

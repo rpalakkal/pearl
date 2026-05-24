@@ -1,8 +1,8 @@
-import { secp256k1, schnorr } from '@noble/curves/secp256k1.js';
-import { sha256 } from '@noble/hashes/sha2.js';
-import { bech32m } from 'bech32';
-import { networkConfig } from './constants.ts';
-import type { PearlNetwork } from './types.ts';
+import {secp256k1, schnorr} from '@noble/curves/secp256k1.js';
+import {sha256} from '@noble/hashes/sha2.js';
+import {bech32m} from 'bech32';
+import {networkConfig} from './constants.ts';
+import type {PearlNetwork} from './types.ts';
 
 const textEncoder = new TextEncoder();
 const tapTweakTag = sha256(textEncoder.encode('TapTweak'));
@@ -25,7 +25,10 @@ export function pearlTaprootScriptFromAddress(address: string, network: PearlNet
   return Uint8Array.from([0x51, 0x20, ...outputKey]);
 }
 
-export function pearlTaprootOutputKeyFromAddress(address: string, network: PearlNetwork): Uint8Array {
+export function pearlTaprootOutputKeyFromAddress(
+  address: string,
+  network: PearlNetwork
+): Uint8Array {
   let decoded: ReturnType<typeof bech32m.decode>;
 
   try {

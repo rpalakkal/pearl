@@ -48,17 +48,17 @@ function getDeviceName(device: HardwareWalletDeviceIdentity): string {
   return `${device.manufacturerName ?? ''} ${device.productName ?? ''}`;
 }
 
-function isHardwareWalletOrigin(origin: string, options: HardwareWalletOriginOptions = {}): boolean {
+function isHardwareWalletOrigin(
+  origin: string,
+  options: HardwareWalletOriginOptions = {}
+): boolean {
   if (origin.startsWith('file://')) {
     return options.allowFileOrigin === true;
   }
 
   try {
     const url = new URL(origin);
-    return (
-      (options.allowedAppOrigins ?? []).includes(url.origin) ||
-      isTrezorConnectUrl(origin)
-    );
+    return (options.allowedAppOrigins ?? []).includes(url.origin) || isTrezorConnectUrl(origin);
   } catch {
     return false;
   }
@@ -85,7 +85,9 @@ function isTrustedAppFileUrl(url: string): boolean {
 function isTrezorConnectUrl(url: string): boolean {
   try {
     const parsed = new URL(url);
-    return parsed.origin === 'https://connect.trezor.io' || parsed.origin === 'https://suite.trezor.io';
+    return (
+      parsed.origin === 'https://connect.trezor.io' || parsed.origin === 'https://suite.trezor.io'
+    );
   } catch {
     return false;
   }

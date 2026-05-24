@@ -1,6 +1,6 @@
-import { RpcClient, RpcConfig } from '../rpc-client.ts';
-import { formatAndSortTransactions } from './transaction-formatter.ts';
-import { WalletRpcMethods } from './wallet-rpc-methods.ts';
+import {RpcClient, RpcConfig} from '../rpc-client.ts';
+import {formatAndSortTransactions} from './transaction-formatter.ts';
+import {WalletRpcMethods} from './wallet-rpc-methods.ts';
 
 class WalletService extends WalletRpcMethods {
   constructor(config: RpcConfig) {
@@ -29,11 +29,11 @@ class WalletService extends WalletRpcMethods {
     // THIS IS A HACK TO REMOVE THE SENT TRANSACTIONS WITH NO FEE AND TO HIDE ACTIVITIES THAT WAS CREATED
     // BY CURRENT WALLET (TO HIDE USED UTXOS THAT WASNT SPENT TOTALLY)
     const filteredTransactions = allTransactions.filter(
-      ({ type, fee }) => !(type === 'sent' && fee === 0)
+      ({type, fee}) => !(type === 'sent' && fee === 0)
     );
     const transactions = filteredTransactions.slice(from, from + count);
     return transactions;
   }
 }
 
-export { WalletService };
+export {WalletService};

@@ -1,5 +1,5 @@
-import { BlockbookClient } from '../../clients/blockbook-client.ts';
-import { normalizeBlockbookAddress } from '../../clients/blockbook-normalizers.ts';
+import {BlockbookClient} from '../../clients/blockbook-client.ts';
+import {normalizeBlockbookAddress} from '../../clients/blockbook-normalizers.ts';
 import type {
   AppNetwork,
   HardwareWalletBalance,
@@ -17,7 +17,7 @@ async function getHardwareWalletBalance(
     BlockbookClient.getUtxos(normalizedAddress, network),
   ]);
 
-  return { info, utxos };
+  return {info, utxos};
 }
 
 export const HardwareWalletService = {
@@ -40,6 +40,6 @@ export const HardwareWalletService = {
       balance = null;
     }
 
-    return { balance, txid };
+    return {balance, txid};
   },
 };

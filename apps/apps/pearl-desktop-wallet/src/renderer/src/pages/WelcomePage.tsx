@@ -1,10 +1,10 @@
-import { Button } from '@/components/ui/button';
-import { ShieldCheck, ArrowRightLeft, BarChart3, Usb } from 'lucide-react';
-import { Link, useNavigate } from 'react-router-dom';
-import { useEffect, useState } from 'react';
-import { NetworkSelector } from '../components/NetworkSelector';
-import { SettingsButton } from '../components/SettingsButton';
-import { Logo, LogoSmall } from '@pearl/ui';
+import {Button} from '@/components/ui/button';
+import {ShieldCheck, ArrowRightLeft, BarChart3, Usb} from 'lucide-react';
+import {Link, useNavigate} from 'react-router-dom';
+import {useEffect, useState} from 'react';
+import {NetworkSelector} from '../components/NetworkSelector';
+import {SettingsButton} from '../components/SettingsButton';
+import {Logo, LogoSmall} from '@pearl/ui';
 
 const features = [
   {
@@ -115,11 +115,7 @@ export default function WelcomePage() {
       </div>
 
       <div className="w-full max-w-xs space-y-3">
-        <Button
-          asChild
-          size="lg"
-          className="w-full"
-        >
+        <Button asChild size="lg" className="w-full">
           <Link to="/onboarding/create">Create A New Wallet</Link>
         </Button>
         <Button

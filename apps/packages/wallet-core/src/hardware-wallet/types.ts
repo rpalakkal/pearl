@@ -95,8 +95,11 @@ export interface LedgerPearlSignPsbtOptions {
   finalizePsbt: true;
   accountPath: string;
   addressFormat: 'bech32m';
-  knownAddressDerivations: Map<string, {
-    pubkey: HardwareWalletBuffer;
-    path: number[];
-  }>;
+  knownAddressDerivations: Map<
+    string,
+    {
+      pubkey: HardwareWalletBuffer;
+      path: number[];
+    }
+  >;
 }

@@ -1,6 +1,6 @@
-import { getBitcoinDeviceDisplayAddress } from './address.ts';
-import { ensureHardwareWalletBrowserGlobals } from './browser.ts';
-import { getTrezorCoin } from './paths.ts';
+import {getBitcoinDeviceDisplayAddress} from './address.ts';
+import {ensureHardwareWalletBrowserGlobals} from './browser.ts';
+import {getTrezorCoin} from './paths.ts';
 import {
   buildPearlSendPlan,
   buildTrezorSignTransactionPayload,
@@ -18,12 +18,14 @@ let trezorConnectPromise: Promise<typeof import('@trezor/connect-web').default> 
 
 export async function getTrezorPublicKey(path: string, network: PearlNetwork): Promise<string> {
   const TrezorConnect = await getTrezorConnect();
-  const response = await runTrezorAction(() => TrezorConnect.getPublicKey({
-    path,
-    coin: getTrezorCoin(network),
-    crossChain: true,
-    scriptType: 'SPENDTAPROOT',
-  }));
+  const response = await runTrezorAction(() =>
+    TrezorConnect.getPublicKey({
+      path,
+      coin: getTrezorCoin(network),
+      crossChain: true,
+      scriptType: 'SPENDTAPROOT',
+    })
+  );
 
   return response.payload.publicKey;
 }
@@ -33,13 +35,15 @@ export async function verifyTrezorWalletAddress(
 ): Promise<HardwareWalletAddressVerification> {
   const expectedDeviceAddress = getBitcoinDeviceDisplayAddress(account.address, account.network);
   const TrezorConnect = await getTrezorConnect();
-  const response = await runTrezorAction(() => TrezorConnect.getAddress({
-    path: account.path,
-    coin: getTrezorCoin(account.network),
-    crossChain: true,
-    scriptType: 'SPENDTAPROOT',
-    showOnTrezor: true,
-  }));
+  const response = await runTrezorAction(() =>
+    TrezorConnect.getAddress({
+      path: account.path,
+      coin: getTrezorCoin(account.network),
+      crossChain: true,
+      scriptType: 'SPENDTAPROOT',
+      showOnTrezor: true,
+    })
+  );
 
   if (response.payload.address !== expectedDeviceAddress) {
     throw new Error('Trezor returned a different address than the connected hardware account.');
@@ -61,9 +65,9 @@ export async function signTrezorPearlTransaction(
 
   const plan = await buildPearlSendPlan(request);
   const TrezorConnect = await getTrezorConnect();
-  const response = await runTrezorAction(() => TrezorConnect.signTransaction(
-    buildTrezorSignTransactionPayload(request, plan)
-  ));
+  const response = await runTrezorAction(() =>
+    TrezorConnect.signTransaction(buildTrezorSignTransactionPayload(request, plan))
+  );
   const rawTransactionHex = getTrezorSerializedTransaction(response.payload);
   await validateSignedHardwareTransaction(rawTransactionHex, request, plan);
 
@@ -92,7 +96,7 @@ async function getTrezorConnect() {
 
 async function initializeTrezorConnect() {
   await ensureHardwareWalletBrowserGlobals();
-  const { default: TrezorConnect } = await import('@trezor/connect-web');
+  const {default: TrezorConnect} = await import('@trezor/connect-web');
 
   await TrezorConnect.init({
     manifest: {
@@ -108,9 +112,9 @@ async function initializeTrezorConnect() {
   return TrezorConnect;
 }
 
-async function runTrezorAction<T extends { success: boolean; payload: unknown }>(
+async function runTrezorAction<T extends {success: boolean; payload: unknown}>(
   action: () => Promise<T>
-): Promise<T & { success: true }> {
+): Promise<T & {success: true}> {
   try {
     const response = await action();
 
@@ -118,7 +122,7 @@ async function runTrezorAction<T extends { success: boolean; payload: unknown }>
       throw new Error(getTrezorPayloadError(response.payload));
     }
 
-    return response as T & { success: true };
+    return response as T & {success: true};
   } catch (error) {
     if (isRecoverableTrezorSessionError(error)) {
       resetTrezorConnectSession();
@@ -136,7 +140,7 @@ function getTrezorPayloadError(payload: unknown): string {
   return 'Trezor action did not complete.';
 }
 
-function getTrezorSerializedTransaction(payload: { serializedTx?: unknown }): string {
+function getTrezorSerializedTransaction(payload: {serializedTx?: unknown}): string {
   if (typeof payload.serializedTx !== 'string' || payload.serializedTx.trim() === '') {
     throw new Error('Trezor did not return a signed transaction.');
   }
@@ -145,7 +149,8 @@ function getTrezorSerializedTransaction(payload: { serializedTx?: unknown }): st
 }
 
 function isRecoverableTrezorSessionError(error: unknown): boolean {
-  const message = error instanceof Error ? error.message.toLowerCase() : String(error || '').toLowerCase();
+  const message =
+    error instanceof Error ? error.message.toLowerCase() : String(error || '').toLowerCase();
 
   return (
     message.includes('failure_actioncancelled') ||

@@ -1,4 +1,4 @@
-import { SATS_PER_PEARL } from './constants.ts';
+import {SATS_PER_PEARL} from './constants.ts';
 
 export function parsePearlAmountToSats(amount: string): bigint {
   const normalized = amount.trim();

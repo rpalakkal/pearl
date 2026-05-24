@@ -1,5 +1,5 @@
-import { ArrowLeft } from 'lucide-react';
-import type { HardwareWalletHeaderModel, HardwareWalletViewActions } from './viewModel.ts';
+import {ArrowLeft} from 'lucide-react';
+import type {HardwareWalletHeaderModel, HardwareWalletViewActions} from './viewModel.ts';
 
 export function HardwareWalletHeader({
   actions,

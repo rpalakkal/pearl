@@ -5,7 +5,7 @@ import {
   type HardwarePearlSendPreview,
   type HardwareWalletAddress,
 } from '../../lib/hardwareWallet.ts';
-import type { BlockbookAddressInfo, BlockbookUtxo } from '../../../../types/app-bridge.ts';
+import type {BlockbookAddressInfo, BlockbookUtxo} from '../../../../types/app-bridge.ts';
 
 type HardwareWalletLogLevel = 'info' | 'warn' | 'error';
 type HardwareWalletLogDetails = Record<string, string | number | boolean | null | undefined>;
@@ -14,7 +14,9 @@ export function isPendingHardwareUtxo(utxo: BlockbookUtxo): boolean {
   return !isConfirmedHardwareUtxo(utxo);
 }
 
-export function hasPendingOutgoingHardwareTransaction(info: BlockbookAddressInfo | null | undefined): boolean {
+export function hasPendingOutgoingHardwareTransaction(
+  info: BlockbookAddressInfo | null | undefined
+): boolean {
   if (!info) {
     return false;
   }
@@ -81,7 +83,9 @@ export function logHardwareWalletEvent(
   console.info(message);
 }
 
-export function hardwareAccountLogContext(account: HardwareWalletAddress): HardwareWalletLogDetails {
+export function hardwareAccountLogContext(
+  account: HardwareWalletAddress
+): HardwareWalletLogDetails {
   return {
     vendor: account.vendor,
     network: account.network,
@@ -119,7 +123,9 @@ export function hardwareBalanceLogContext(
   };
 }
 
-export function hardwareSendPreviewLogContext(preview: HardwarePearlSendPreview): HardwareWalletLogDetails {
+export function hardwareSendPreviewLogContext(
+  preview: HardwarePearlSendPreview
+): HardwareWalletLogDetails {
   return {
     amountSats: preview.amountSats.toString(),
     feeSats: preview.feeSats.toString(),

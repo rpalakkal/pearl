@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { schnorr } from '@noble/curves/secp256k1.js';
+import {schnorr} from '@noble/curves/secp256k1.js';
 import {
   buildLedgerSignPsbtOptions,
   buildPearlSendPlan,
@@ -24,7 +24,7 @@ import {
 
 test('previews and builds the same one-input Pearl Taproot PSBT plan', async () => {
   const utxos: HardwareWalletUtxo[] = [
-    { txid: '11'.repeat(32), vout: 0, value: '100000', confirmations: 1 },
+    {txid: '11'.repeat(32), vout: 0, value: '100000', confirmations: 1},
   ];
   const request = {
     account,
@@ -40,12 +40,17 @@ test('previews and builds the same one-input Pearl Taproot PSBT plan', async () 
   assert.equal(preview.feeSats, 154n);
   assert.equal(preview.changeSats, 49_846n);
   assert.equal(preview.inputCount, 1);
-  assert.deepEqual(preview.selectedOutpoints, [{
-    txid: '11'.repeat(32),
-    vout: 0,
-    valueSats: 100_000n,
-  }]);
-  assert.equal(preview.deviceDisplayAddress, getBitcoinDeviceDisplayAddress(mainnetAddress, 'mainnet'));
+  assert.deepEqual(preview.selectedOutpoints, [
+    {
+      txid: '11'.repeat(32),
+      vout: 0,
+      valueSats: 100_000n,
+    },
+  ]);
+  assert.equal(
+    preview.deviceDisplayAddress,
+    getBitcoinDeviceDisplayAddress(mainnetAddress, 'mainnet')
+  );
   assert.equal(plan.feeSats, preview.feeSats);
   assert.equal(plan.changeSats, preview.changeSats);
   assert.equal(plan.selectedUtxos.length, preview.inputCount);
@@ -78,14 +83,14 @@ test('tracks selected outpoints in previews so refreshed input changes require r
     destinationAddress: mainnetAddress,
     amountSats: 50_000n,
     feeRatePrlPerKb: 0.00001,
-    utxos: [{ txid: '11'.repeat(32), vout: 0, value: '100000', confirmations: 1 }],
+    utxos: [{txid: '11'.repeat(32), vout: 0, value: '100000', confirmations: 1}],
   });
   const right = previewHardwarePearlSend({
     account,
     destinationAddress: mainnetAddress,
     amountSats: 50_000n,
     feeRatePrlPerKb: 0.00001,
-    utxos: [{ txid: '22'.repeat(32), vout: 0, value: '100000', confirmations: 1 }],
+    utxos: [{txid: '22'.repeat(32), vout: 0, value: '100000', confirmations: 1}],
   });
 
   assert.equal(left.inputCount, right.inputCount);
@@ -100,7 +105,7 @@ test('builds the Taproot-only Trezor Connect signing payload for Pearl sends', a
     destinationAddress: mainnetAddress,
     amountSats: 50_000n,
     feeRatePrlPerKb: 0.00001,
-    utxos: [{ txid: '99'.repeat(32), vout: 2, value: '100000', confirmations: 1 }],
+    utxos: [{txid: '99'.repeat(32), vout: 2, value: '100000', confirmations: 1}],
   };
   const plan = await buildPearlSendPlan(request);
   const payload = buildTrezorSignTransactionPayload(request, plan);
@@ -110,14 +115,16 @@ test('builds the Taproot-only Trezor Connect signing payload for Pearl sends', a
     serialize: true,
     version: 2,
     locktime: 0,
-    inputs: [{
-      address_n: [0x80000056, 0x80000000, 0x80000000, 0, 0],
-      prev_hash: '99'.repeat(32),
-      prev_index: 2,
-      amount: '100000',
-      script_type: 'SPENDTAPROOT',
-      sequence: 0xffffffff,
-    }],
+    inputs: [
+      {
+        address_n: [0x80000056, 0x80000000, 0x80000000, 0, 0],
+        prev_hash: '99'.repeat(32),
+        prev_index: 2,
+        amount: '100000',
+        script_type: 'SPENDTAPROOT',
+        sequence: 0xffffffff,
+      },
+    ],
     outputs: [
       {
         address: getBitcoinDeviceDisplayAddress(mainnetAddress, 'mainnet'),
@@ -133,7 +140,7 @@ test('builds the Taproot-only Trezor Connect signing payload for Pearl sends', a
   });
 
   assert.throws(
-    () => buildTrezorSignTransactionPayload({ ...request, account }, plan),
+    () => buildTrezorSignTransactionPayload({...request, account}, plan),
     /non-Trezor account/
   );
 });
@@ -149,7 +156,7 @@ test('builds Ledger PSBT signing options with known Pearl Taproot derivation dat
     destinationAddress: mainnetAddress,
     amountSats: 50_000n,
     feeRatePrlPerKb: 0.00001,
-    utxos: [{ txid: 'aa'.repeat(32), vout: 1, value: '100000', confirmations: 1 }],
+    utxos: [{txid: 'aa'.repeat(32), vout: 1, value: '100000', confirmations: 1}],
   };
   const plan = await buildPearlSendPlan(request);
   const options = await buildLedgerSignPsbtOptions(indexedAccount, plan);
@@ -163,10 +170,7 @@ test('builds Ledger PSBT signing options with known Pearl Taproot derivation dat
   assert.equal(derivations[0][1].pubkey.toString('hex'), publicKey);
   assert.deepEqual(derivations[0][1].path, [0x80000056, 0x80000000, 0x80000000, 0, 2]);
 
-  await assert.rejects(
-    () => buildLedgerSignPsbtOptions(trezorAccount, plan),
-    /non-Ledger account/
-  );
+  await assert.rejects(() => buildLedgerSignPsbtOptions(trezorAccount, plan), /non-Ledger account/);
 });
 
 test('validates Taproot key-path signatures returned by a hardware wallet', async () => {
@@ -175,12 +179,14 @@ test('validates Taproot key-path signatures returned by a hardware wallet', asyn
     destinationAddress: mainnetAddress,
     amountSats: 50_000n,
     feeRatePrlPerKb: 0.00001,
-    utxos: [{ txid: '55'.repeat(32), vout: 0, value: '100000', confirmations: 1 }],
+    utxos: [{txid: '55'.repeat(32), vout: 0, value: '100000', confirmations: 1}],
   };
   const plan = await buildPearlSendPlan(request);
   const bitcoin = await import('bitcoinjs-lib');
   const sourceScript = Buffer.from(pearlTaprootScriptFromAddress(account.address, account.network));
-  const destinationScript = Buffer.from(pearlTaprootScriptFromAddress(mainnetAddress, account.network));
+  const destinationScript = Buffer.from(
+    pearlTaprootScriptFromAddress(mainnetAddress, account.network)
+  );
   const tx = new bitcoin.Transaction();
 
   tx.version = 2;
@@ -242,7 +248,9 @@ test('validates Taproot key-path signatures returned by a hardware wallet', asyn
 
   await assert.doesNotReject(() => validateSignedHardwareTransaction(tx.toHex(), request, plan));
 
-  tx.setWitness(0, [Buffer.concat([signature, Buffer.from([bitcoin.Transaction.SIGHASH_DEFAULT])])]);
+  tx.setWitness(0, [
+    Buffer.concat([signature, Buffer.from([bitcoin.Transaction.SIGHASH_DEFAULT])]),
+  ]);
 
   await assert.rejects(
     () => validateSignedHardwareTransaction(tx.toHex(), request, plan),
@@ -265,7 +273,7 @@ test('folds dust change into the transaction fee', async () => {
     destinationAddress: mainnetAddress,
     amountSats: 50_000n,
     feeRatePrlPerKb: 0.00001,
-    utxos: [{ txid: '22'.repeat(32), vout: 0, value: '50120', confirmations: 1 }],
+    utxos: [{txid: '22'.repeat(32), vout: 0, value: '50120', confirmations: 1}],
   };
   const preview = previewHardwarePearlSend(request);
   const plan = await buildPearlSendPlan(request);
@@ -290,8 +298,8 @@ test('excludes unconfirmed hardware wallet UTXOs from send plans', async () => {
     amountSats: 50_000n,
     feeRatePrlPerKb: 0.00001,
     utxos: [
-      { txid: '44'.repeat(32), vout: 0, value: '1000000', confirmations: 0 },
-      { txid: confirmedTxid, vout: 0, value: '100000', confirmations: 1 },
+      {txid: '44'.repeat(32), vout: 0, value: '1000000', confirmations: 0},
+      {txid: confirmedTxid, vout: 0, value: '100000', confirmations: 1},
     ],
   };
   const preview = previewHardwarePearlSend(request);
@@ -310,8 +318,8 @@ test('requires Blockbook confirmation metadata before spending hardware wallet U
     amountSats: 50_000n,
     feeRatePrlPerKb: 0.00001,
     utxos: [
-      { txid: '66'.repeat(32), vout: 0, value: '1000000' },
-      { txid: confirmedTxid, vout: 0, value: '100000', height: 1 },
+      {txid: '66'.repeat(32), vout: 0, value: '1000000'},
+      {txid: confirmedTxid, vout: 0, value: '100000', height: 1},
     ],
   };
   const preview = previewHardwarePearlSend(request);
@@ -326,13 +334,14 @@ test('requires Blockbook confirmation metadata before spending hardware wallet U
 
 test('explains when only pending hardware wallet funds can cover a send', () => {
   assert.throws(
-    () => previewHardwarePearlSend({
-      account,
-      destinationAddress: mainnetAddress,
-      amountSats: 50_000n,
-      feeRatePrlPerKb: 0.00001,
-      utxos: [{ txid: '55'.repeat(32), vout: 0, value: '1000000', confirmations: 0 }],
-    }),
+    () =>
+      previewHardwarePearlSend({
+        account,
+        destinationAddress: mainnetAddress,
+        amountSats: 50_000n,
+        feeRatePrlPerKb: 0.00001,
+        utxos: [{txid: '55'.repeat(32), vout: 0, value: '1000000', confirmations: 0}],
+      }),
     /Insufficient confirmed hardware wallet balance/
   );
 });

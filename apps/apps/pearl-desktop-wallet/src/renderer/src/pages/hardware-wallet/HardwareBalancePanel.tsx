@@ -1,6 +1,6 @@
-import { RefreshCw } from 'lucide-react';
-import { formatSatsAsPearl } from '../../lib/hardwareWallet.ts';
-import type { HardwareWalletBalanceModel, HardwareWalletViewActions } from './viewModel.ts';
+import {RefreshCw} from 'lucide-react';
+import {formatSatsAsPearl} from '../../lib/hardwareWallet.ts';
+import type {HardwareWalletBalanceModel, HardwareWalletViewActions} from './viewModel.ts';
 
 export function HardwareBalancePanel({
   actions,
@@ -22,7 +22,9 @@ export function HardwareBalancePanel({
           disabled={model.isLoadingBalance || model.hasPendingDeviceOperation}
           className="rounded-md p-1.5 transition-colors hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-50"
         >
-          <RefreshCw className={`h-4 w-4 text-gray-600 ${model.isLoadingBalance ? 'animate-spin' : ''}`} />
+          <RefreshCw
+            className={`h-4 w-4 text-gray-600 ${model.isLoadingBalance ? 'animate-spin' : ''}`}
+          />
         </button>
       </div>
 
@@ -32,7 +34,9 @@ export function HardwareBalancePanel({
         <div className="grid gap-3 sm:grid-cols-3">
           <BalanceMetric
             label="Spendable"
-            value={model.isLoadingBalance ? 'Loading' : formatSatsAsPearl(model.spendableBalanceSats)}
+            value={
+              model.isLoadingBalance ? 'Loading' : formatSatsAsPearl(model.spendableBalanceSats)
+            }
           />
           <BalanceMetric
             label={model.pendingBalanceLabel}
@@ -63,14 +67,14 @@ function BalanceMetric({
   value: string;
   tone?: 'default' | 'warning';
 }) {
-  const valueClassName = tone === 'warning'
-    ? 'text-amber-900'
-    : 'text-gray-900';
+  const valueClassName = tone === 'warning' ? 'text-amber-900' : 'text-gray-900';
 
   return (
     <div className="min-w-0 rounded-md bg-white p-3">
       <div className="mb-1 text-xs font-medium uppercase text-gray-500">{label}</div>
-      <div className={`whitespace-normal break-words font-mono text-xs leading-5 sm:text-[13px] ${valueClassName}`}>
+      <div
+        className={`whitespace-normal break-words font-mono text-xs leading-5 sm:text-[13px] ${valueClassName}`}
+      >
         {value}
       </div>
     </div>

@@ -1,14 +1,17 @@
-import { Loader2, Send } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { formatSatsAsPearl } from '../../lib/hardwareWallet.ts';
-import { AlertMessage } from './AlertMessage.tsx';
-import type { HardwareWalletSendModel, HardwareWalletViewActions } from './viewModel.ts';
+import {Loader2, Send} from 'lucide-react';
+import {Button} from '@/components/ui/button';
+import {formatSatsAsPearl} from '../../lib/hardwareWallet.ts';
+import {AlertMessage} from './AlertMessage.tsx';
+import type {HardwareWalletSendModel, HardwareWalletViewActions} from './viewModel.ts';
 
 export function HardwareSendPanel({
   actions,
   model,
 }: {
-  actions: Pick<HardwareWalletViewActions, 'sendHardwareTransaction' | 'setSendAddress' | 'setSendAmount'>;
+  actions: Pick<
+    HardwareWalletViewActions,
+    'sendHardwareTransaction' | 'setSendAddress' | 'setSendAmount'
+  >;
   model: HardwareWalletSendModel;
 }) {
   return (
@@ -17,9 +20,7 @@ export function HardwareSendPanel({
         <div className="flex items-center justify-between gap-3">
           <div>
             <div className="text-sm font-medium text-gray-700">Send Pearl</div>
-            <div className="text-xs text-gray-500">
-              Fee rate {model.feeRate.toFixed(8)} PRL/kB
-            </div>
+            <div className="text-xs text-gray-500">Fee rate {model.feeRate.toFixed(8)} PRL/kB</div>
           </div>
         </div>
 
@@ -32,7 +33,7 @@ export function HardwareSendPanel({
               placeholder="0.00"
               inputMode="decimal"
               disabled={model.hasPendingDeviceOperation}
-              className="mt-1 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 outline-none transition-colors focus:border-brand-green"
+              className="focus:border-brand-green mt-1 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 outline-none transition-colors"
             />
           </label>
 
@@ -43,7 +44,7 @@ export function HardwareSendPanel({
               onChange={event => actions.setSendAddress(event.target.value)}
               placeholder={model.activeSendNetwork === 'testnet' ? 'tprl1...' : 'prl1...'}
               disabled={model.hasPendingDeviceOperation}
-              className="mt-1 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 font-mono text-sm text-gray-900 outline-none transition-colors focus:border-brand-green"
+              className="focus:border-brand-green mt-1 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 font-mono text-sm text-gray-900 outline-none transition-colors"
             />
           </label>
 
@@ -113,7 +114,7 @@ export function HardwareSendPanel({
   );
 }
 
-function SendPreviewMetric({ label, value }: { label: string; value: string }) {
+function SendPreviewMetric({label, value}: {label: string; value: string}) {
   return (
     <div className="min-w-0 rounded-md bg-white p-2">
       <div className="mb-1 font-medium uppercase text-gray-500">{label}</div>

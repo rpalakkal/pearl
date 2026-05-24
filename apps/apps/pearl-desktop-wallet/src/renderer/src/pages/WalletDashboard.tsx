@@ -1,14 +1,18 @@
-import { useState, type ReactNode } from 'react';
-import { Copy, CheckCircle2, ArrowUpRight, ArrowDownLeft, Lock, Key, Loader2, Usb } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
-import { useWalletStore } from '../store/walletStore';
-import { formatPearlAmount } from '../lib/crypto';
+import {useState, type ReactNode} from 'react';
 import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from '../components/ui/tooltip';
+  Copy,
+  CheckCircle2,
+  ArrowUpRight,
+  ArrowDownLeft,
+  Lock,
+  Key,
+  Loader2,
+  Usb,
+} from 'lucide-react';
+import {useNavigate} from 'react-router-dom';
+import {useWalletStore} from '../store/walletStore';
+import {formatPearlAmount} from '../lib/crypto';
+import {Tooltip, TooltipContent, TooltipProvider, TooltipTrigger} from '../components/ui/tooltip';
 
 export default function WalletDashboard() {
   const navigate = useNavigate();
@@ -23,7 +27,7 @@ export default function WalletDashboard() {
     syncPhase,
     isBlockchainSynced,
   } = useWalletStore();
-  const { clearWalletData } = useWalletStore();
+  const {clearWalletData} = useWalletStore();
   const [copiedAddress, setCopiedAddress] = useState<string | null>(null);
   const [walletAddress] = useState<string>('');
 
@@ -115,7 +119,7 @@ export default function WalletDashboard() {
           <div className="space-y-2 text-center">
             <div className="text-base text-gray-600">Total Balance</div>
             {typeof balance === 'number' ? (
-              <div className="text-4xl font-bold text-gray-900 sm:text-5xl text-nowrap">
+              <div className="text-nowrap text-4xl font-bold text-gray-900 sm:text-5xl">
                 {formatPearlAmount(balance)} PRL
               </div>
             ) : (
@@ -232,7 +236,7 @@ export default function WalletDashboard() {
                     <div className="flex items-center gap-3">
                       <div className="flex h-8 w-8 items-center justify-center rounded-full bg-gray-100">
                         {activity.type === 'received' ? (
-                          <ArrowDownLeft className="text-green-700 h-4 w-4" />
+                          <ArrowDownLeft className="h-4 w-4 text-green-700" />
                         ) : (
                           <ArrowUpRight className="h-4 w-4 text-red-500" />
                         )}
@@ -245,8 +249,9 @@ export default function WalletDashboard() {
                       </div>
                     </div>
                     <div
-                      className={`text-sm font-medium ${activity.type === 'received' ? 'text-green-700' : 'text-red-500'
-                        }`}
+                      className={`text-sm font-medium ${
+                        activity.type === 'received' ? 'text-green-700' : 'text-red-500'
+                      }`}
                     >
                       {activity.type === 'received' ? '+' : '-'}
                       {activity.amount} PRL
@@ -273,7 +278,7 @@ interface ActionTileProps {
   disabledTooltip?: string;
 }
 
-function ActionTile({ onClick, icon, label, disabled = false, disabledTooltip }: ActionTileProps) {
+function ActionTile({onClick, icon, label, disabled = false, disabledTooltip}: ActionTileProps) {
   const baseClasses =
     'flex w-full flex-col items-center gap-2 rounded-lg border p-4 shadow-sm transition-all sm:gap-3 sm:p-5';
   const enabledClasses =
@@ -288,7 +293,9 @@ function ActionTile({ onClick, icon, label, disabled = false, disabledTooltip }:
       disabled={disabled}
       className={`${baseClasses} ${disabled ? disabledClasses : enabledClasses}`}
     >
-      <div className={`flex h-8 w-8 items-center justify-center rounded-full ${iconBg} sm:h-10 sm:w-10`}>
+      <div
+        className={`flex h-8 w-8 items-center justify-center rounded-full ${iconBg} sm:h-10 sm:w-10`}
+      >
         {icon}
       </div>
       <span className="text-sm font-medium text-gray-900 sm:text-base">{label}</span>
@@ -325,7 +332,7 @@ interface SyncStageProps {
   note?: string;
 }
 
-function SyncStage({ label, current, total, active, done, note }: SyncStageProps) {
+function SyncStage({label, current, total, active, done, note}: SyncStageProps) {
   // Pending stages show an empty bar and a "— / total" counter. Reporting the raw
   // `current` value while pending is misleading: `block_height` is already non-zero during
   // the filter-header phase because the address manager tracks block-level rollforward
@@ -333,7 +340,11 @@ function SyncStage({ label, current, total, active, done, note }: SyncStageProps
   const pending = !active && !done;
   const pct = done ? 100 : pending ? 0 : total > 0 ? Math.min(100, (current / total) * 100) : 0;
   const barColor = done ? 'bg-green-500' : active ? 'bg-amber-500' : 'bg-gray-300';
-  const labelColor = active ? 'font-medium text-amber-700' : done ? 'text-green-700' : 'text-gray-500';
+  const labelColor = active
+    ? 'font-medium text-amber-700'
+    : done
+      ? 'text-green-700'
+      : 'text-gray-500';
   const displayCurrent = pending ? '—' : current.toLocaleString();
   const displayTotal = total > 0 ? total.toLocaleString() : '—';
   return (
@@ -347,7 +358,7 @@ function SyncStage({ label, current, total, active, done, note }: SyncStageProps
       <div className="mx-auto h-1.5 w-full overflow-hidden rounded-full bg-gray-200">
         <div
           className={`h-full rounded-full ${barColor} transition-all duration-500`}
-          style={{ width: `${pct}%` }}
+          style={{width: `${pct}%`}}
         />
       </div>
       {note && <p className="text-left text-[11px] text-gray-500">{note}</p>}

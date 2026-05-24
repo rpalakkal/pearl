@@ -90,20 +90,11 @@ test('uses Bitcoin-family BIP86 paths accepted by hardware Bitcoin apps', () => 
   assert.equal(getPearlHardwareWalletPath('testnet', 'trezor'), "m/86'/1'/0'/0/0");
   assert.equal(getPearlHardwareWalletPath('mainnet', 'ledger', 2), "m/86'/0'/0'/0/2");
   assert.equal(getPearlHardwareWalletPath('testnet', 'ledger', 999), "m/86'/1'/0'/0/999");
-  assert.equal(
-    getHardwareWalletAddressIndexFromPath("m/86'/0'/0'/0/2", 'mainnet', 'ledger'),
-    2
-  );
+  assert.equal(getHardwareWalletAddressIndexFromPath("m/86'/0'/0'/0/2", 'mainnet', 'ledger'), 2);
   assert.equal(getPearlHardwareWalletAccountPath('mainnet', 'ledger'), "m/86'/0'/0'");
   assert.equal(getPearlHardwareWalletAccountPath('testnet', 'trezor'), "m/86'/1'/0'");
-  assert.equal(
-    normalizeHardwareWalletAddressIndex(DEFAULT_HARDWARE_WALLET_ADDRESS_INDEX),
-    0
-  );
-  assert.equal(
-    normalizeHardwareWalletAddressIndex(String(MAX_HARDWARE_WALLET_ADDRESS_INDEX)),
-    999
-  );
+  assert.equal(normalizeHardwareWalletAddressIndex(DEFAULT_HARDWARE_WALLET_ADDRESS_INDEX), 0);
+  assert.equal(normalizeHardwareWalletAddressIndex(String(MAX_HARDWARE_WALLET_ADDRESS_INDEX)), 999);
   assert.throws(() => getPearlHardwareWalletPath('mainnet', 'ledger', -1), /address index/);
   assert.throws(() => getPearlHardwareWalletPath('mainnet', 'ledger', 1000), /address index/);
   assert.throws(
@@ -147,13 +138,14 @@ test('rejects inconsistent stored hardware account metadata before planning', ()
     /address does not match its public key/
   );
   assert.throws(
-    () => previewHardwarePearlSend({
-      account: mismatchedPath,
-      destinationAddress: mainnetAddress,
-      amountSats: 1_000n,
-      feeRatePrlPerKb: 0.00001,
-      utxos: [{ txid: '00'.repeat(32), vout: 0, value: '10000', confirmations: 1 }],
-    }),
+    () =>
+      previewHardwarePearlSend({
+        account: mismatchedPath,
+        destinationAddress: mainnetAddress,
+        amountSats: 1_000n,
+        feeRatePrlPerKb: 0.00001,
+        utxos: [{txid: '00'.repeat(32), vout: 0, value: '10000', confirmations: 1}],
+      }),
     /unsupported derivation path/
   );
   assert.throws(
@@ -182,17 +174,27 @@ test('stores and restores hardware wallet accounts by vendor, network, and addre
   saveStoredHardwareAccount(testnetLedgerAccount, storage);
 
   assert.deepEqual(
-    listStoredHardwareAccounts('mainnet', 'ledger', storage).map(storedAccount => storedAccount.addressIndex),
+    listStoredHardwareAccounts('mainnet', 'ledger', storage).map(
+      storedAccount => storedAccount.addressIndex
+    ),
     [0, 1]
   );
-  assert.equal(readStoredHardwareAccount('mainnet', 'ledger', 1, storage)?.path, ledgerAccount1.path);
-  assert.equal(readStoredHardwareAccount('mainnet', undefined, undefined, storage)?.vendor, 'trezor');
+  assert.equal(
+    readStoredHardwareAccount('mainnet', 'ledger', 1, storage)?.path,
+    ledgerAccount1.path
+  );
+  assert.equal(
+    readStoredHardwareAccount('mainnet', undefined, undefined, storage)?.vendor,
+    'trezor'
+  );
   assert.equal(readStoredHardwareAccount('testnet', 'ledger', 0, storage)?.address, testnetAddress);
 
   forgetStoredHardwareAccount('mainnet', 'ledger', 1, storage);
 
   assert.deepEqual(
-    listStoredHardwareAccounts('mainnet', 'ledger', storage).map(storedAccount => storedAccount.addressIndex),
+    listStoredHardwareAccounts('mainnet', 'ledger', storage).map(
+      storedAccount => storedAccount.addressIndex
+    ),
     [0]
   );
   assert.equal(readStoredHardwareAccount('mainnet', 'ledger', 1, storage), null);
@@ -200,7 +202,7 @@ test('stores and restores hardware wallet accounts by vendor, network, and addre
 
 test('migrates legacy index-zero hardware wallet storage without leaking it to other slots', () => {
   const storage = new MemoryStorage();
-  const legacyAccount = { ...account };
+  const legacyAccount = {...account};
   delete (legacyAccount as Partial<HardwareWalletAddress>).addressIndex;
 
   storage.setItem('pearl.hardwareWalletAccount.v1.mainnet.ledger', JSON.stringify(legacyAccount));
@@ -209,7 +211,9 @@ test('migrates legacy index-zero hardware wallet storage without leaking it to o
   assert.equal(readStoredHardwareAccount('mainnet', 'ledger', 0, storage)?.addressIndex, 0);
   assert.equal(readStoredHardwareAccount('mainnet', 'ledger', 1, storage), null);
   assert.deepEqual(
-    listStoredHardwareAccounts('mainnet', 'ledger', storage).map(storedAccount => storedAccount.addressIndex),
+    listStoredHardwareAccounts('mainnet', 'ledger', storage).map(
+      storedAccount => storedAccount.addressIndex
+    ),
     [0]
   );
 });
@@ -227,8 +231,9 @@ test('builds address selector options from remembered and active hardware accoun
   };
 
   assert.deepEqual(
-    getHardwareAddressSelectorOptions([account, ledgerAccount2], null, 'ledger', 'mainnet', 1)
-      .map(option => [option.addressIndex, Boolean(option.account)]),
+    getHardwareAddressSelectorOptions([account, ledgerAccount2], null, 'ledger', 'mainnet', 1).map(
+      option => [option.addressIndex, Boolean(option.account)]
+    ),
     [
       [0, true],
       [1, false],
@@ -236,8 +241,13 @@ test('builds address selector options from remembered and active hardware accoun
     ]
   );
   assert.deepEqual(
-    getHardwareAddressSelectorOptions([account, ledgerAccount2], activeLedgerAccount3, 'ledger', 'mainnet', 3)
-      .map(option => [option.addressIndex, Boolean(option.account)]),
+    getHardwareAddressSelectorOptions(
+      [account, ledgerAccount2],
+      activeLedgerAccount3,
+      'ledger',
+      'mainnet',
+      3
+    ).map(option => [option.addressIndex, Boolean(option.account)]),
     [
       [0, true],
       [2, true],
@@ -250,17 +260,24 @@ test('builds address selector options from remembered and active hardware accoun
 test('rejects signing with a device that does not match the stored hardware account', () => {
   const otherPublicKey = '02c6047f9441ed7d6d3045406e95c07cd85c778e4b8cef3ca7abac09b95c709ee5';
 
-  assert.doesNotThrow(() => validateHardwareWalletDeviceAccount(
-    account,
-    publicKey,
-    getBitcoinDeviceDisplayAddress(account.address, account.network)
-  ));
+  assert.doesNotThrow(() =>
+    validateHardwareWalletDeviceAccount(
+      account,
+      publicKey,
+      getBitcoinDeviceDisplayAddress(account.address, account.network)
+    )
+  );
   assert.throws(
     () => validateHardwareWalletDeviceAccount(account, otherPublicKey),
     /does not match this Pearl hardware account/
   );
   assert.throws(
-    () => validateHardwareWalletDeviceAccount(account, publicKey, getBitcoinDeviceDisplayAddress(testnetAddress, 'testnet')),
+    () =>
+      validateHardwareWalletDeviceAccount(
+        account,
+        publicKey,
+        getBitcoinDeviceDisplayAddress(testnetAddress, 'testnet')
+      ),
     /returned a different address/
   );
 });
@@ -283,7 +300,10 @@ test('maps common device access errors to actionable hardware wallet messages', 
     'Trezor device access is not available in this Electron runtime.'
   );
   assert.equal(
-    getHardwareWalletErrorMessage(new Error('signPsbtBuffer is not supported with the legacy Bitcoin app'), 'ledger'),
+    getHardwareWalletErrorMessage(
+      new Error('signPsbtBuffer is not supported with the legacy Bitcoin app'),
+      'ledger'
+    ),
     'Update the Ledger Bitcoin app in Ledger Live to a Taproot-capable version, then quit Ledger Live, reopen the Bitcoin app on the device, and try again.'
   );
   assert.equal(
@@ -299,7 +319,10 @@ test('maps common device access errors to actionable hardware wallet messages', 
     'Unlock your Trezor and try again.'
   );
   assert.equal(
-    getHardwareWalletErrorMessage(new Error('Unable to establish connection with iframe'), 'trezor'),
+    getHardwareWalletErrorMessage(
+      new Error('Unable to establish connection with iframe'),
+      'trezor'
+    ),
     'Trezor Connect did not load. Check your internet connection and try again.'
   );
   assert.equal(
@@ -341,7 +364,9 @@ test('falls back to a Ledger legacy public-key read only when address display is
   assert.equal(response.publicKey, publicKey);
   assert.equal(response.bitcoinAddress, '');
   assert.equal(
-    isLedgerUnsupportedTaprootAddressError(new Error('signPsbtBuffer is not supported with the legacy Bitcoin app')),
+    isLedgerUnsupportedTaprootAddressError(
+      new Error('signPsbtBuffer is not supported with the legacy Bitcoin app')
+    ),
     true
   );
 
@@ -354,26 +379,29 @@ test('falls back to a Ledger legacy public-key read only when address display is
 });
 
 test('models spendable hardware balances without spending pending funds', () => {
-  const confirmedUtxo = { txid: '11'.repeat(32), vout: 0, value: '1000', confirmations: 1 };
-  const pendingUtxo = { txid: '22'.repeat(32), vout: 0, value: '5000', confirmations: 0 };
+  const confirmedUtxo = {txid: '11'.repeat(32), vout: 0, value: '1000', confirmations: 1};
+  const pendingUtxo = {txid: '22'.repeat(32), vout: 0, value: '5000', confirmations: 0};
 
   assert.equal(isPendingHardwareUtxo(confirmedUtxo), false);
   assert.equal(isPendingHardwareUtxo(pendingUtxo), true);
   assert.equal(getHardwareUtxoValue(confirmedUtxo), 1000n);
-  assert.equal(getHardwareUtxoValue({ ...confirmedUtxo, value: '-1' }), 0n);
+  assert.equal(getHardwareUtxoValue({...confirmedUtxo, value: '-1'}), 0n);
   assert.equal(getSpendableHardwareUtxoValue(confirmedUtxo), 1000n);
   assert.equal(getSpendableHardwareUtxoValue(pendingUtxo), 0n);
   assert.equal(getHardwareBalanceSats('-2500'), -2500n);
   assert.equal(getHardwareBalanceSats('not-a-number'), 0n);
-  assert.equal(hasPendingOutgoingHardwareTransaction({
-    address: account.address,
-    balance: '0',
-    totalReceived: '0',
-    totalSent: '0',
-    unconfirmedBalance: '-1',
-    unconfirmedTxs: 1,
-    txs: 1,
-  }), true);
+  assert.equal(
+    hasPendingOutgoingHardwareTransaction({
+      address: account.address,
+      balance: '0',
+      totalReceived: '0',
+      totalSent: '0',
+      unconfirmedBalance: '-1',
+      unconfirmedTxs: 1,
+      txs: 1,
+    }),
+    true
+  );
 });
 
 test('compares send previews by selected outpoints and device display address', () => {
@@ -382,33 +410,36 @@ test('compares send previews by selected outpoints and device display address', 
     destinationAddress: mainnetAddress,
     amountSats: 50_000n,
     feeRatePrlPerKb: 0.00001,
-    utxos: [{ txid: '11'.repeat(32), vout: 0, value: '100000', confirmations: 1 }],
+    utxos: [{txid: '11'.repeat(32), vout: 0, value: '100000', confirmations: 1}],
   });
   const same = previewHardwarePearlSend({
     account,
     destinationAddress: mainnetAddress,
     amountSats: 50_000n,
     feeRatePrlPerKb: 0.00001,
-    utxos: [{ txid: '11'.repeat(32), vout: 0, value: '100000', confirmations: 1 }],
+    utxos: [{txid: '11'.repeat(32), vout: 0, value: '100000', confirmations: 1}],
   });
   const differentInput = previewHardwarePearlSend({
     account,
     destinationAddress: mainnetAddress,
     amountSats: 50_000n,
     feeRatePrlPerKb: 0.00001,
-    utxos: [{ txid: '22'.repeat(32), vout: 0, value: '100000', confirmations: 1 }],
+    utxos: [{txid: '22'.repeat(32), vout: 0, value: '100000', confirmations: 1}],
   });
 
   assert.equal(sendPreviewsEqual(left, same), true);
   assert.equal(sendPreviewsEqual(left, differentInput), false);
-  assert.equal(hardwareAccountKey(account), [
-    account.network,
-    account.vendor,
-    account.addressIndex,
-    account.path,
-    account.address,
-    account.publicKey,
-  ].join('.'));
+  assert.equal(
+    hardwareAccountKey(account),
+    [
+      account.network,
+      account.vendor,
+      account.addressIndex,
+      account.path,
+      account.address,
+      account.publicKey,
+    ].join('.')
+  );
 });
 
 test('emits structured hardware wallet diagnostics', () => {
@@ -417,9 +448,15 @@ test('emits structured hardware wallet diagnostics', () => {
   const originalWarn = console.warn;
   const originalError = console.error;
 
-  console.info = message => { messages.push(String(message)); };
-  console.warn = message => { messages.push(String(message)); };
-  console.error = message => { messages.push(String(message)); };
+  console.info = message => {
+    messages.push(String(message));
+  };
+  console.warn = message => {
+    messages.push(String(message));
+  };
+  console.error = message => {
+    messages.push(String(message));
+  };
 
   try {
     logHardwareWalletEvent('connect:start', {
@@ -428,8 +465,8 @@ test('emits structured hardware wallet diagnostics', () => {
       network: 'mainnet',
       skipped: null,
     });
-    logHardwareWalletEvent('send:pending-outgoing', { pendingOutgoing: true }, 'warn');
-    logHardwareWalletEvent('send:error', { error: 'failed' }, 'error');
+    logHardwareWalletEvent('send:pending-outgoing', {pendingOutgoing: true}, 'warn');
+    logHardwareWalletEvent('send:error', {error: 'failed'}, 'error');
   } finally {
     console.info = originalInfo;
     console.warn = originalWarn;

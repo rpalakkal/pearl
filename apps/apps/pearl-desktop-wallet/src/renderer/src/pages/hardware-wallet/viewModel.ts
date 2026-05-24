@@ -1,15 +1,15 @@
-import type { LucideIcon } from 'lucide-react';
+import type {LucideIcon} from 'lucide-react';
 import type {
   HardwarePearlSendPreview,
   HardwareWalletAddress,
   HardwareWalletVendor,
   PearlNetwork,
 } from '../../lib/hardwareWallet.ts';
-import type { HardwareAddressSelectorOption } from '../../lib/hardwareWalletStorage.ts';
+import type {HardwareAddressSelectorOption} from '../../lib/hardwareWalletStorage.ts';
 
 export type SendPreviewState =
-  | { preview: HardwarePearlSendPreview; error: null }
-  | { preview: null; error: string | null };
+  | {preview: HardwarePearlSendPreview; error: null}
+  | {preview: null; error: string | null};
 
 export interface HardwareWalletVendorOption {
   vendor: HardwareWalletVendor;

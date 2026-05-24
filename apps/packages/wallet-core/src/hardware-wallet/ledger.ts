@@ -1,8 +1,8 @@
-import { derivePearlTaprootAddress, getBitcoinDeviceDisplayAddress } from './address.ts';
-import { validateHardwareWalletDeviceAccount } from './account.ts';
-import { ensureHardwareWalletBuffer, ensureHardwareWalletBrowserGlobals } from './browser.ts';
-import { isLedgerUnsupportedTaprootAddressError } from './errors.ts';
-import { getLedgerCurrency } from './paths.ts';
+import {derivePearlTaprootAddress, getBitcoinDeviceDisplayAddress} from './address.ts';
+import {validateHardwareWalletDeviceAccount} from './account.ts';
+import {ensureHardwareWalletBuffer, ensureHardwareWalletBrowserGlobals} from './browser.ts';
+import {isLedgerUnsupportedTaprootAddressError} from './errors.ts';
+import {getLedgerCurrency} from './paths.ts';
 import {
   buildLedgerSignPsbtOptions,
   buildPearlSendPlan,
@@ -61,25 +61,22 @@ export async function signLedgerPearlTransaction(
   const transport = await openLedgerTransport(TransportWebHID, true);
   try {
     const plan = await buildPearlSendPlan(request);
-    const { default: Btc } = await import('@ledgerhq/hw-app-btc');
+    const {default: Btc} = await import('@ledgerhq/hw-app-btc');
     const app = new Btc({
       transport,
       currency: getLedgerCurrency(request.account.network),
     });
-    const deviceAccount = await readLedgerTaprootWalletPublicKey(
-      async format => {
-        const response = await app.getWalletPublicKey(request.account.path.replace(/^m\//, ''), {
-          format,
-          verify: false,
-        });
+    const deviceAccount = await readLedgerTaprootWalletPublicKey(async format => {
+      const response = await app.getWalletPublicKey(request.account.path.replace(/^m\//, ''), {
+        format,
+        verify: false,
+      });
 
-        return {
-          publicKey: response.publicKey,
-          bitcoinAddress: response.bitcoinAddress,
-        };
-      },
-      false
-    );
+      return {
+        publicKey: response.publicKey,
+        bitcoinAddress: response.bitcoinAddress,
+      };
+    }, false);
     validateHardwareWalletDeviceAccount(
       request.account,
       deviceAccount.publicKey,
@@ -132,27 +129,24 @@ async function getLedgerWalletPublicKey(
   network: PearlNetwork,
   verify: boolean,
   preferConnected: boolean
-): Promise<{ publicKey: string; bitcoinAddress: string }> {
+): Promise<{publicKey: string; bitcoinAddress: string}> {
   const TransportWebHID = await getLedgerTransportWebHID();
   const transport = await openLedgerTransport(TransportWebHID, preferConnected);
 
   try {
-    const { default: Btc } = await import('@ledgerhq/hw-app-btc');
-    const app = new Btc({ transport, currency: getLedgerCurrency(network) });
-    return await readLedgerTaprootWalletPublicKey(
-      async format => {
-        const response = await app.getWalletPublicKey(path.replace(/^m\//, ''), {
-          format,
-          verify,
-        });
+    const {default: Btc} = await import('@ledgerhq/hw-app-btc');
+    const app = new Btc({transport, currency: getLedgerCurrency(network)});
+    return await readLedgerTaprootWalletPublicKey(async format => {
+      const response = await app.getWalletPublicKey(path.replace(/^m\//, ''), {
+        format,
+        verify,
+      });
 
-        return {
-          publicKey: response.publicKey,
-          bitcoinAddress: response.bitcoinAddress,
-        };
-      },
-      verify
-    );
+      return {
+        publicKey: response.publicKey,
+        bitcoinAddress: response.bitcoinAddress,
+      };
+    }, verify);
   } finally {
     await transport.close();
   }
@@ -160,7 +154,7 @@ async function getLedgerWalletPublicKey(
 
 async function getLedgerTransportWebHID(): Promise<LedgerTransportWebHID> {
   await ensureHardwareWalletBrowserGlobals();
-  const { default: TransportWebHID } = await import('@ledgerhq/hw-transport-webhid');
+  const {default: TransportWebHID} = await import('@ledgerhq/hw-transport-webhid');
   const supported = await TransportWebHID.isSupported();
 
   if (!supported) {

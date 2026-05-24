@@ -11,10 +11,7 @@ import {
 test('builds and parses normalized hardware wallet paths', () => {
   assert.equal(getPearlHardwareWalletPath('mainnet', 'ledger', 2), "m/86'/0'/0'/0/2");
   assert.equal(getPearlHardwareWalletPath('testnet', 'trezor', 7), "m/86'/1'/0'/0/7");
-  assert.equal(
-    getHardwareWalletAddressIndexFromPath("m/86'/0'/0'/0/2", 'mainnet', 'ledger'),
-    2
-  );
+  assert.equal(getHardwareWalletAddressIndexFromPath("m/86'/0'/0'/0/2", 'mainnet', 'ledger'), 2);
   assert.equal(normalizeHardwareWalletAddressIndex('3'), 3);
   assert.throws(() => normalizeHardwareWalletAddressIndex(1000), /between 0 and 999/);
 });

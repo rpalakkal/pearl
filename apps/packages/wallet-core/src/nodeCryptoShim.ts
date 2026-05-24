@@ -1,6 +1,6 @@
-import { gcm } from '@noble/ciphers/aes.js';
-import { sha256, sha512 } from '@noble/hashes/sha2.js';
-import { Buffer } from 'buffer';
+import {gcm} from '@noble/ciphers/aes.js';
+import {sha256, sha512} from '@noble/hashes/sha2.js';
+import {Buffer} from 'buffer';
 
 type BinaryLike = string | ArrayBuffer | ArrayBufferView | ArrayLike<number>;
 type HashEncoding = BufferEncoding | 'buffer';
@@ -52,9 +52,7 @@ class BrowserHash {
   private readonly hash: ReturnType<typeof sha256.create> | ReturnType<typeof sha512.create>;
 
   constructor(algorithm: string) {
-    this.hash = normalizeHashAlgorithm(algorithm) === 'sha256'
-      ? sha256.create()
-      : sha512.create();
+    this.hash = normalizeHashAlgorithm(algorithm) === 'sha256' ? sha256.create() : sha512.create();
   }
 
   update(data: BinaryLike, inputEncoding?: BufferEncoding): this {
@@ -110,13 +108,19 @@ class BrowserAesGcmCipher {
     return this;
   }
 
-  update(data: BinaryLike, inputEncoding?: BufferEncoding, outputEncoding?: BufferEncoding): AnyBuffer | string {
+  update(
+    data: BinaryLike,
+    inputEncoding?: BufferEncoding,
+    outputEncoding?: BufferEncoding
+  ): AnyBuffer | string {
     if (this.updated) {
       throw new Error('AES-GCM shim supports one update call per cipher.');
     }
     this.updated = true;
 
-    const encrypted = Buffer.from(gcm(this.key, this.iv, this.aad).encrypt(toBuffer(data, inputEncoding)));
+    const encrypted = Buffer.from(
+      gcm(this.key, this.iv, this.aad).encrypt(toBuffer(data, inputEncoding))
+    );
     this.authTag = encrypted.subarray(encrypted.length - GCM_AUTH_TAG_BYTES);
     return encodeBuffer(encrypted.subarray(0, -GCM_AUTH_TAG_BYTES), outputEncoding);
   }
@@ -161,7 +165,11 @@ class BrowserAesGcmDecipher {
     return this;
   }
 
-  update(data: BinaryLike, inputEncoding?: BufferEncoding, outputEncoding?: BufferEncoding): AnyBuffer | string {
+  update(
+    data: BinaryLike,
+    inputEncoding?: BufferEncoding,
+    outputEncoding?: BufferEncoding
+  ): AnyBuffer | string {
     if (this.updated) {
       throw new Error('AES-GCM shim supports one update call per decipher.');
     }
@@ -194,13 +202,17 @@ export function randomBytes(size: number): AnyBuffer;
 export function randomBytes(size: number, callback: RandomBytesCallback): void;
 export function randomBytes(size: number, callback?: RandomBytesCallback): AnyBuffer | void {
   if (!Number.isSafeInteger(size) || size < 0) {
-    throw new RangeError(`The "size" argument must be a non-negative safe integer. Received ${size}.`);
+    throw new RangeError(
+      `The "size" argument must be a non-negative safe integer. Received ${size}.`
+    );
   }
 
   const bytes = Buffer.allocUnsafe(size);
   const crypto = getWebCrypto();
   for (let offset = 0; offset < size; offset += MAX_GET_RANDOM_VALUES_BYTES) {
-    crypto.getRandomValues(bytes.subarray(offset, Math.min(offset + MAX_GET_RANDOM_VALUES_BYTES, size)));
+    crypto.getRandomValues(
+      bytes.subarray(offset, Math.min(offset + MAX_GET_RANDOM_VALUES_BYTES, size))
+    );
   }
 
   if (callback) {
@@ -235,7 +247,7 @@ export function createCipheriv(
   algorithm: string,
   key: BinaryLike,
   iv: BinaryLike,
-  options?: { authTagLength?: number }
+  options?: {authTagLength?: number}
 ): BrowserAesGcmCipher {
   return new BrowserAesGcmCipher(
     validateAesGcmInputs(algorithm, key, options?.authTagLength),
@@ -247,7 +259,7 @@ export function createDecipheriv(
   algorithm: string,
   key: BinaryLike,
   iv: BinaryLike,
-  options?: { authTagLength?: number }
+  options?: {authTagLength?: number}
 ): BrowserAesGcmDecipher {
   return new BrowserAesGcmDecipher(
     validateAesGcmInputs(algorithm, key, options?.authTagLength),

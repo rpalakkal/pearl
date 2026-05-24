@@ -22,7 +22,7 @@ import {
   logHardwareWalletEvent,
   sendPreviewsEqual,
 } from './pageModel.ts';
-import type { HardwareWalletBalanceData } from './balanceData.ts';
+import type {HardwareWalletBalanceData} from './balanceData.ts';
 
 export const PENDING_OUTGOING_HARDWARE_SEND_MESSAGE =
   'A hardware wallet transaction is pending. Wait for it to confirm before sending again.';
@@ -93,10 +93,14 @@ export async function sendHardwareTransactionWorkflow({
 
     if (hasPendingOutgoingHardwareTransaction(latestBalance.info)) {
       setBalanceData(latestBalance);
-      logHardwareWalletEvent('send:pending-outgoing', {
-        ...hardwareAccountLogContext(account),
-        ...hardwareBalanceLogContext(latestBalance.info, latestBalance.utxos),
-      }, 'warn');
+      logHardwareWalletEvent(
+        'send:pending-outgoing',
+        {
+          ...hardwareAccountLogContext(account),
+          ...hardwareBalanceLogContext(latestBalance.info, latestBalance.utxos),
+        },
+        'warn'
+      );
       throw new Error(PENDING_OUTGOING_HARDWARE_SEND_MESSAGE);
     }
 
@@ -122,13 +126,19 @@ export async function sendHardwareTransactionWorkflow({
     setFeeRate(nextFeeRate);
 
     if (!sendPreviewsEqual(currentPreview, latestPreview)) {
-      logHardwareWalletEvent('send:preview-changed', {
-        beforeFeeSats: currentPreview.feeSats.toString(),
-        afterFeeSats: latestPreview.feeSats.toString(),
-        beforeInputs: currentPreview.inputCount,
-        afterInputs: latestPreview.inputCount,
-      }, 'warn');
-      throw new Error('Balance or fee estimate changed. Review the updated preview before signing.');
+      logHardwareWalletEvent(
+        'send:preview-changed',
+        {
+          beforeFeeSats: currentPreview.feeSats.toString(),
+          afterFeeSats: latestPreview.feeSats.toString(),
+          beforeInputs: currentPreview.inputCount,
+          afterInputs: latestPreview.inputCount,
+        },
+        'warn'
+      );
+      throw new Error(
+        'Balance or fee estimate changed. Review the updated preview before signing.'
+      );
     }
 
     logHardwareWalletEvent('send:signature-request', hardwareSendPreviewLogContext(latestPreview));
@@ -175,18 +185,19 @@ export async function sendHardwareTransactionWorkflow({
       setBalanceData(broadcastResult.balance);
       logHardwareWalletEvent('send:balance-refreshed', {
         ...hardwareAccountLogContext(account),
-        ...hardwareBalanceLogContext(
-          broadcastResult.balance.info,
-          broadcastResult.balance.utxos
-        ),
+        ...hardwareBalanceLogContext(broadcastResult.balance.info, broadcastResult.balance.utxos),
       });
       return;
     }
 
-    logHardwareWalletEvent('send:balance-refresh-error', {
-      ...hardwareAccountLogContext(account),
-      error: 'Blockbook balance refresh unavailable after broadcast',
-    }, 'warn');
+    logHardwareWalletEvent(
+      'send:balance-refresh-error',
+      {
+        ...hardwareAccountLogContext(account),
+        error: 'Blockbook balance refresh unavailable after broadcast',
+      },
+      'warn'
+    );
     setBalanceError('Transaction broadcast. Refresh balance to update Blockbook status.');
   } catch (error) {
     if (!isActiveHardwareAccount(account)) {
@@ -194,10 +205,14 @@ export async function sendHardwareTransactionWorkflow({
     }
 
     console.error('Failed to send hardware wallet transaction:', error);
-    logHardwareWalletEvent('send:error', {
-      ...hardwareAccountLogContext(account),
-      error: getErrorLogMessage(error),
-    }, 'error');
+    logHardwareWalletEvent(
+      'send:error',
+      {
+        ...hardwareAccountLogContext(account),
+        error: getErrorLogMessage(error),
+      },
+      'error'
+    );
     setSendError(getHardwareWalletErrorMessage(error, account.vendor));
   }
 }

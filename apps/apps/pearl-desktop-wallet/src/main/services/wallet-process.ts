@@ -1,10 +1,10 @@
-import { spawn, ChildProcess } from 'child_process';
-import { join } from 'path';
-import { app } from 'electron';
+import {spawn, ChildProcess} from 'child_process';
+import {join} from 'path';
+import {app} from 'electron';
 import fs from 'fs';
 import path from 'path';
-import { WalletService } from './wallet-service/wallet-service';
-import { getCurrentNetworkConfig } from '../config/network-config';
+import {WalletService} from './wallet-service/wallet-service';
+import {getCurrentNetworkConfig} from '../config/network-config';
 
 const binaryNameMap: Record<string, Record<string, string>> = {
   win32: {
@@ -37,7 +37,7 @@ class WalletProcess {
   constructor(
     private readonly config: WalletProcessConfig,
     private readonly walletService: WalletService
-  ) { }
+  ) {}
 
   isRunning() {
     return this.isProcessRunning;
@@ -55,7 +55,7 @@ class WalletProcess {
   }
 
   getBinaryPath(): string {
-    const { platform, arch } = process;
+    const {platform, arch} = process;
     let binaryName = binaryNameMap[platform][arch];
     if (!binaryName) {
       throw new Error(`Unsupported platform: ${platform} architecture: ${arch}`);
@@ -112,7 +112,7 @@ class WalletProcess {
   private async startWalletProcess(
     passphrase?: string,
     seed?: string
-  ): Promise<{ success: true; message: string; seed?: string } | { success: false; error: string }> {
+  ): Promise<{success: true; message: string; seed?: string} | {success: false; error: string}> {
     const binaryPath = this.getBinaryPath();
     const walletPassphrase = passphrase ?? this.walletPassphrase;
 
@@ -120,7 +120,7 @@ class WalletProcess {
       const networkConfig = getCurrentNetworkConfig();
       const networkDir = path.join(this.config.dataDir, networkConfig.dataSubdir);
       if (fs.existsSync(networkDir)) {
-        fs.rmSync(networkDir, { recursive: true, force: true });
+        fs.rmSync(networkDir, {recursive: true, force: true});
       }
 
       const walletDbPath = path.join(this.config.dataDir, 'wallet.db');
@@ -141,7 +141,7 @@ class WalletProcess {
       fs.writeFileSync(walletConfigFile, JSON.stringify(walletConfig, null, 2));
 
       return new Promise<
-        { success: true; message: string; seed?: string } | { success: false; error: string }
+        {success: true; message: string; seed?: string} | {success: false; error: string}
       >(resolve => {
         try {
           const args = this.getWalletArgs();
@@ -180,7 +180,7 @@ class WalletProcess {
             if (walletConfigFile && fs.existsSync(walletConfigFile)) {
               try {
                 fs.unlinkSync(walletConfigFile);
-              } catch { }
+              } catch {}
             }
           };
 
@@ -191,7 +191,7 @@ class WalletProcess {
               hasResolved = true;
               if (code === 0) {
                 if (isImport) {
-                  resolve({ success: true, message: 'Wallet imported successfully' });
+                  resolve({success: true, message: 'Wallet imported successfully'});
                 } else if (extractedSeed) {
                   resolve({
                     success: true,
@@ -218,7 +218,7 @@ class WalletProcess {
 
             if (!hasResolved) {
               hasResolved = true;
-              resolve({ success: false, error: (error as Error).message });
+              resolve({success: false, error: (error as Error).message});
             }
           });
 
@@ -227,12 +227,12 @@ class WalletProcess {
               hasResolved = true;
               try {
                 childProcess.kill('SIGTERM');
-              } catch { }
+              } catch {}
 
               setTimeout(() => {
                 try {
                   childProcess.kill('SIGKILL');
-                } catch { }
+                } catch {}
               }, 2000);
 
               cleanup();
@@ -244,7 +244,7 @@ class WalletProcess {
           }, 30000);
         } catch (error) {
           const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-          resolve({ success: false, error: errorMessage });
+          resolve({success: false, error: errorMessage});
         }
       });
     } catch (error) {
@@ -257,7 +257,7 @@ class WalletProcess {
 
   async start() {
     if (this.isProcessRunning) {
-      return { success: false as const, message: 'Wallet is already running' };
+      return {success: false as const, message: 'Wallet is already running'};
     }
 
     const binaryPath = this.getBinaryPath();
@@ -269,9 +269,9 @@ class WalletProcess {
     try {
       await this.killExistingWalletProcesses();
       await new Promise(resolve => setTimeout(resolve, 500));
-    } catch { }
+    } catch {}
 
-    return new Promise<{ success: true; message: string }>((resolve, reject) => {
+    return new Promise<{success: true; message: string}>((resolve, reject) => {
       try {
         const args = [...this.getWalletArgs()];
 
@@ -313,7 +313,7 @@ class WalletProcess {
                 isResolved = true;
                 this.isProcessRunning = true;
                 cleanup();
-                resolve({ success: true, message: 'Wallet started successfully' });
+                resolve({success: true, message: 'Wallet started successfully'});
               }
             } catch (e: any) {
               // Wallet not ready yet, keep trying
@@ -364,14 +364,14 @@ class WalletProcess {
     });
   }
 
-  async stop(options: { force?: boolean } = {}) {
+  async stop(options: {force?: boolean} = {}) {
     if (!this.isProcessRunning || !this.process) {
-      return { success: false as const, message: 'Wallet is not running' };
+      return {success: false as const, message: 'Wallet is not running'};
     }
 
-    return new Promise<{ success: true; message: string }>(resolve => {
+    return new Promise<{success: true; message: string}>(resolve => {
       if (!this.process) {
-        resolve({ success: true, message: 'Wallet is not running' });
+        resolve({success: true, message: 'Wallet is not running'});
         return;
       }
 
@@ -412,7 +412,7 @@ class WalletProcess {
 
   async killExistingWalletProcesses() {
     return new Promise<void>(resolve => {
-      const lsofProcess = spawn('lsof', ['-i', ':8335'], { stdio: 'pipe' });
+      const lsofProcess = spawn('lsof', ['-i', ':8335'], {stdio: 'pipe'});
       let output = '';
 
       lsofProcess.stdout?.on('data', data => {
@@ -437,7 +437,7 @@ class WalletProcess {
             for (const pid of pids) {
               try {
                 spawn('kill', ['-9', pid]);
-              } catch { }
+              } catch {}
             }
           }
         }
@@ -451,5 +451,5 @@ class WalletProcess {
   }
 }
 
-export { WalletProcess };
-export type { WalletProcessConfig };
+export {WalletProcess};
+export type {WalletProcessConfig};

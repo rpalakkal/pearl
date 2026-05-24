@@ -1,17 +1,17 @@
-import { useState, useEffect } from 'react';
-import { Lock, Eye, EyeOff, AlertCircle, ChevronDown, CheckCircle2, Usb } from 'lucide-react';
-import { useNavigate, useLocation } from 'react-router-dom';
-import { useWalletStore } from '../store/walletStore';
-import { getErrorMessage } from '../lib/utils';
-import { NetworkSelector } from '../components/NetworkSelector';
-import { SettingsButton } from '../components/SettingsButton';
-import { UpgradeCta } from '../components/UpgradeCta';
-import { Button } from '@pearl/ui';
+import {useState, useEffect} from 'react';
+import {Lock, Eye, EyeOff, AlertCircle, ChevronDown, CheckCircle2, Usb} from 'lucide-react';
+import {useNavigate, useLocation} from 'react-router-dom';
+import {useWalletStore} from '../store/walletStore';
+import {getErrorMessage} from '../lib/utils';
+import {NetworkSelector} from '../components/NetworkSelector';
+import {SettingsButton} from '../components/SettingsButton';
+import {UpgradeCta} from '../components/UpgradeCta';
+import {Button} from '@pearl/ui';
 
 export default function WalletUnlock() {
   const navigate = useNavigate();
   const location = useLocation();
-  const { clearWalletData } = useWalletStore();
+  const {clearWalletData} = useWalletStore();
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [isUnlocking, setIsUnlocking] = useState(false);
@@ -112,9 +112,11 @@ export default function WalletUnlock() {
       const errorMessage = getErrorMessage(err);
 
       // Check if it's a peer connection error
-      if (errorMessage.includes('Please make sure your internet connection is') ||
+      if (
+        errorMessage.includes('Please make sure your internet connection is') ||
         errorMessage.includes('Cannot resolve hostname') ||
-        errorMessage.includes('Connection timeout')) {
+        errorMessage.includes('Connection timeout')
+      ) {
         setError(errorMessage);
       } else if (errorMessage.includes('Failed to set current wallet')) {
         setError(errorMessage);

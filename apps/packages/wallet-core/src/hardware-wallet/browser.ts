@@ -1,15 +1,16 @@
-import { installBrowserNodeGlobals } from '../browserNodeGlobals.ts';
+import {installBrowserNodeGlobals} from '../browserNodeGlobals.ts';
 
 export type BufferConstructor = typeof import('buffer').Buffer;
 
 export function preloadHardwareWalletSupport(): void {
-  void ensureHardwareWalletBrowserGlobals()
-    .then(() => Promise.allSettled([
+  void ensureHardwareWalletBrowserGlobals().then(() =>
+    Promise.allSettled([
       import('@ledgerhq/hw-app-btc'),
       import('@ledgerhq/hw-transport-webhid'),
       import('@trezor/connect-web'),
       import('bitcoinjs-lib'),
-    ]));
+    ])
+  );
 }
 
 export async function loadBitcoinJs() {

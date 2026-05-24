@@ -1,10 +1,13 @@
-import type { HardwareWalletVendor, PearlNetwork } from './types.ts';
+import type {HardwareWalletVendor, PearlNetwork} from './types.ts';
 
-export const networkConfig: Record<PearlNetwork, {
-  hrp: string;
-  deviceHrp: string;
-  coinTypes: Record<HardwareWalletVendor, string>;
-}> = {
+export const networkConfig: Record<
+  PearlNetwork,
+  {
+    hrp: string;
+    deviceHrp: string;
+    coinTypes: Record<HardwareWalletVendor, string>;
+  }
+> = {
   mainnet: {
     hrp: 'prl',
     deviceHrp: 'bc',

@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import {readFileSync} from 'node:fs';
 import test from 'node:test';
 import {
   createCipheriv,
@@ -72,7 +72,10 @@ test('keeps renderer Node polyfills available for hardware signing dependencies'
     dependencies?: Record<string, string>;
   };
 
-  assert.match(viteConfig, /crypto:\s*resolve\(__dirname,\s*'\.\.\/\.\.\/packages\/wallet-core\/src\/nodeCryptoShim\.ts'\)/);
+  assert.match(
+    viteConfig,
+    /crypto:\s*resolve\(__dirname,\s*'\.\.\/\.\.\/packages\/wallet-core\/src\/nodeCryptoShim\.ts'\)/
+  );
   assert.match(viteConfig, /events:\s*resolve\(__dirname,\s*'node_modules\/events'\)/);
   assert.match(viteConfig, /stream:\s*resolve\(__dirname,\s*'node_modules\/stream-browserify'\)/);
   assert.match(viteConfig, /util:\s*resolve\(__dirname,\s*'node_modules\/util'\)/);
@@ -85,9 +88,15 @@ test('keeps renderer Node polyfills available for hardware signing dependencies'
 });
 
 test('preloads hardware wallet modules before user-triggered device prompts', () => {
-  const hardwareWalletSource = readFileSync(new URL('./hardwareWallet.ts', import.meta.url), 'utf8');
+  const hardwareWalletSource = readFileSync(
+    new URL('./hardwareWallet.ts', import.meta.url),
+    'utf8'
+  );
   const browserSource = readFileSync(
-    new URL('../../../../../../packages/wallet-core/src/hardware-wallet/browser.ts', import.meta.url),
+    new URL(
+      '../../../../../../packages/wallet-core/src/hardware-wallet/browser.ts',
+      import.meta.url
+    ),
     'utf8'
   );
   const hardwareWalletController = readFileSync(
@@ -97,7 +106,7 @@ test('preloads hardware wallet modules before user-triggered device prompts', ()
 
   assert.match(hardwareWalletSource, /@pearl\/wallet-core\/hardware/);
   assert.match(browserSource, /export function preloadHardwareWalletSupport/);
-  assert.match(browserSource, /ensureHardwareWalletBrowserGlobals\(\)\s*\n\s*\.then/);
+  assert.match(browserSource, /ensureHardwareWalletBrowserGlobals\(\)\s*\.then/);
   assert.match(browserSource, /Promise\.allSettled/);
   assert.match(browserSource, /import\('@ledgerhq\/hw-transport-webhid'\)/);
   assert.match(browserSource, /import\('@ledgerhq\/hw-app-btc'\)/);
@@ -107,32 +116,44 @@ test('preloads hardware wallet modules before user-triggered device prompts', ()
 
 test('installs the Buffer polyfill before loading browser hardware dependencies', () => {
   const browserSource = readFileSync(
-    new URL('../../../../../../packages/wallet-core/src/hardware-wallet/browser.ts', import.meta.url),
+    new URL(
+      '../../../../../../packages/wallet-core/src/hardware-wallet/browser.ts',
+      import.meta.url
+    ),
     'utf8'
   );
   const ledgerSource = readFileSync(
-    new URL('../../../../../../packages/wallet-core/src/hardware-wallet/ledger.ts', import.meta.url),
+    new URL(
+      '../../../../../../packages/wallet-core/src/hardware-wallet/ledger.ts',
+      import.meta.url
+    ),
     'utf8'
   );
   const trezorSource = readFileSync(
-    new URL('../../../../../../packages/wallet-core/src/hardware-wallet/trezor.ts', import.meta.url),
+    new URL(
+      '../../../../../../packages/wallet-core/src/hardware-wallet/trezor.ts',
+      import.meta.url
+    ),
     'utf8'
   );
   const browserGlobalsSource = readFileSync(
     new URL('../../../../../../packages/wallet-core/src/browserNodeGlobals.ts', import.meta.url),
     'utf8'
   );
-  const rendererEntrySource = readFileSync(
-    new URL('../main.tsx', import.meta.url),
-    'utf8'
-  );
+  const rendererEntrySource = readFileSync(new URL('../main.tsx', import.meta.url), 'utf8');
 
   assert.match(browserSource, /type BufferConstructor = typeof import\('buffer'\)\.Buffer/);
-  assert.match(browserSource, /async function ensureHardwareWalletBuffer\(\): Promise<BufferConstructor>/);
+  assert.match(
+    browserSource,
+    /async function ensureHardwareWalletBuffer\(\): Promise<BufferConstructor>/
+  );
   assert.match(browserSource, /installBrowserNodeGlobals\(\)/);
   assert.match(browserGlobalsSource, /type BrowserProcessShim =/);
   assert.match(browserGlobalsSource, /export function installBrowserNodeProcess\(\): void/);
-  assert.match(browserGlobalsSource, /export async function installBrowserNodeGlobals\(\): Promise<BufferConstructor>/);
+  assert.match(
+    browserGlobalsSource,
+    /export async function installBrowserNodeGlobals\(\): Promise<BufferConstructor>/
+  );
   assert.match(browserGlobalsSource, /process\?: BrowserProcessShim/);
   assert.match(browserGlobalsSource, /browser: true/);
   assert.match(browserGlobalsSource, /nextTick\(callback, \.\.\.args\)/);
@@ -141,11 +162,11 @@ test('installs the Buffer polyfill before loading browser hardware dependencies'
   assert.doesNotMatch(rendererEntrySource, /void import\('\.\/App'\)/);
   assert.match(
     ledgerSource,
-    /await ensureHardwareWalletBrowserGlobals\(\);\s*const \{ default: TransportWebHID \} = await import\('@ledgerhq\/hw-transport-webhid'\)/
+    /await ensureHardwareWalletBrowserGlobals\(\);\s*const \{\s*default:\s*TransportWebHID\s*\} = await import\('@ledgerhq\/hw-transport-webhid'\)/
   );
   assert.match(
     trezorSource,
-    /await ensureHardwareWalletBrowserGlobals\(\);\s*const \{ default: TrezorConnect \} = await import\('@trezor\/connect-web'\)/
+    /await ensureHardwareWalletBrowserGlobals\(\);\s*const \{\s*default:\s*TrezorConnect\s*\} = await import\('@trezor\/connect-web'\)/
   );
 });
 
@@ -188,13 +209,16 @@ test('implements the renderer crypto shim surface used by Trezor Connect', () =>
 });
 
 test('identifies only Ledger and Trezor HID/USB devices for Electron permissions', () => {
-  assert.equal(isHardwareWalletDevice({ vendorId: 0x2c97, productId: 0x5011 }), true);
-  assert.equal(isHardwareWalletDevice({ vendorId: 0x534c, productId: 0x0001 }), true);
-  assert.equal(isHardwareWalletDevice({ vendorId: 0x1209, productId: 0x53c0 }), true);
-  assert.equal(isHardwareWalletDevice({ vendorId: 0x1209, productId: 0x53c1 }), true);
-  assert.equal(isHardwareWalletDevice({ vendorId: 0x1209, productId: 0x0001 }), false);
-  assert.equal(isHardwareWalletDevice({ vendorId: 0x1234, productId: 0x0001 }), false);
-  assert.equal(isHardwareWalletDevice({ vendorId: 0x1234, productId: 0x0001, name: 'Ledger Nano X' }), true);
+  assert.equal(isHardwareWalletDevice({vendorId: 0x2c97, productId: 0x5011}), true);
+  assert.equal(isHardwareWalletDevice({vendorId: 0x534c, productId: 0x0001}), true);
+  assert.equal(isHardwareWalletDevice({vendorId: 0x1209, productId: 0x53c0}), true);
+  assert.equal(isHardwareWalletDevice({vendorId: 0x1209, productId: 0x53c1}), true);
+  assert.equal(isHardwareWalletDevice({vendorId: 0x1209, productId: 0x0001}), false);
+  assert.equal(isHardwareWalletDevice({vendorId: 0x1234, productId: 0x0001}), false);
+  assert.equal(
+    isHardwareWalletDevice({vendorId: 0x1234, productId: 0x0001, name: 'Ledger Nano X'}),
+    true
+  );
   assert.equal(
     isHardwareWalletDevice({
       vendorId: 0x1234,
@@ -207,25 +231,48 @@ test('identifies only Ledger and Trezor HID/USB devices for Electron permissions
 });
 
 test('keeps Electron HID and USB permissions scoped to hardware wallet frames and origins', () => {
-  const localhostOrigins = getTrustedHardwareWalletAppOrigins('http://localhost:5173/#/hardware-wallet');
-  const loopbackOrigins = getTrustedHardwareWalletAppOrigins('http://127.0.0.1:5173/#/hardware-wallet');
+  const localhostOrigins = getTrustedHardwareWalletAppOrigins(
+    'http://localhost:5173/#/hardware-wallet'
+  );
+  const loopbackOrigins = getTrustedHardwareWalletAppOrigins(
+    'http://127.0.0.1:5173/#/hardware-wallet'
+  );
 
   assert.equal(
-    isHardwareWalletFrameUrl('file:///Applications/Pearl.app/Contents/Resources/app.asar/out/renderer/index.html'),
+    isHardwareWalletFrameUrl(
+      'file:///Applications/Pearl.app/Contents/Resources/app.asar/out/renderer/index.html'
+    ),
     true
   );
   assert.equal(isHardwareWalletFrameUrl('file:///tmp/other.html'), false);
   assert.equal(isHardwareWalletOrigin('file://'), false);
-  assert.equal(isHardwareWalletOrigin('file://', { allowFileOrigin: true }), true);
+  assert.equal(isHardwareWalletOrigin('file://', {allowFileOrigin: true}), true);
   assert.deepEqual(localhostOrigins, ['http://localhost:5173']);
-  assert.equal(isHardwareWalletOrigin('http://localhost:5173', { allowedAppOrigins: localhostOrigins }), true);
-  assert.equal(isHardwareWalletOrigin('http://127.0.0.1:5173', { allowedAppOrigins: localhostOrigins }), false);
-  assert.equal(isHardwareWalletOrigin('http://127.0.0.1:5173', { allowedAppOrigins: loopbackOrigins }), true);
-  assert.equal(isHardwareWalletFrameUrl('http://localhost:5173/#/hardware-wallet', { allowedAppOrigins: localhostOrigins }), true);
+  assert.equal(
+    isHardwareWalletOrigin('http://localhost:5173', {allowedAppOrigins: localhostOrigins}),
+    true
+  );
+  assert.equal(
+    isHardwareWalletOrigin('http://127.0.0.1:5173', {allowedAppOrigins: localhostOrigins}),
+    false
+  );
+  assert.equal(
+    isHardwareWalletOrigin('http://127.0.0.1:5173', {allowedAppOrigins: loopbackOrigins}),
+    true
+  );
+  assert.equal(
+    isHardwareWalletFrameUrl('http://localhost:5173/#/hardware-wallet', {
+      allowedAppOrigins: localhostOrigins,
+    }),
+    true
+  );
   assert.equal(isHardwareWalletOrigin('https://connect.trezor.io/9/iframe.html'), true);
   assert.equal(isHardwareWalletOrigin('https://suite.trezor.io/webusb'), true);
   assert.equal(isTrezorConnectUrl('https://connect.trezor.io/9/iframe.html'), true);
-  assert.equal(isTrezorConnectUrl('https://connect.trezor.io/9/popup.html?version=9.7.3&env=web'), true);
+  assert.equal(
+    isTrezorConnectUrl('https://connect.trezor.io/9/popup.html?version=9.7.3&env=web'),
+    true
+  );
   assert.equal(isTrezorConnectUrl('https://connect.trezor.io/9/webusb.html'), true);
   assert.equal(isTrezorConnectUrl('https://suite.trezor.io/webusb'), true);
   assert.equal(isHardwareWalletOrigin('https://example.com'), false);
@@ -238,7 +285,10 @@ test('wires Electron HID and USB permission handlers for hardware wallets', () =
     'utf8'
   );
   const hardwareWalletSessionSource = readFileSync(
-    new URL('../../../../src/main/services/window-service/hardware-wallet-session.ts', import.meta.url),
+    new URL(
+      '../../../../src/main/services/window-service/hardware-wallet-session.ts',
+      import.meta.url
+    ),
     'utf8'
   );
 
@@ -246,7 +296,10 @@ test('wires Electron HID and USB permission handlers for hardware wallets', () =
   assert.match(hardwareWalletSessionSource, /hardware-wallet-permissions/);
   assert.match(hardwareWalletSessionSource, /setPermissionCheckHandler/);
   assert.match(hardwareWalletSessionSource, /permission !== 'hid' && permission !== 'usb'/);
-  assert.match(hardwareWalletSessionSource, /isHardwareWalletFrameUrl\(details\.requestingUrl, \{ allowedAppOrigins \}\)/);
+  assert.match(
+    hardwareWalletSessionSource,
+    /isHardwareWalletFrameUrl\(details\.requestingUrl,\s*\{\s*allowedAppOrigins\s*\}\)/
+  );
   assert.match(hardwareWalletSessionSource, /setDevicePermissionHandler/);
   assert.match(hardwareWalletSessionSource, /allowFileOrigin: true/);
   assert.match(hardwareWalletSessionSource, /select-hid-device/);

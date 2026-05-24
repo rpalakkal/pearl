@@ -1,4 +1,4 @@
-import type { HardwareWalletVendorModel, HardwareWalletViewActions } from './viewModel.ts';
+import type {HardwareWalletVendorModel, HardwareWalletViewActions} from './viewModel.ts';
 
 export function VendorSelector({
   actions,

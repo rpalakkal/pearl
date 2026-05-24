@@ -1,16 +1,16 @@
-import { AlertMessage } from './AlertMessage.tsx';
-import { ConnectHardwareWalletButton } from './ConnectHardwareWalletButton.tsx';
-import { HardwareAddressSelector } from './HardwareAddressSelector.tsx';
-import { HardwareBalancePanel } from './HardwareBalancePanel.tsx';
-import { HardwareDetailsPanel } from './HardwareDetailsPanel.tsx';
-import { HardwareSendPanel } from './HardwareSendPanel.tsx';
-import { HardwareWalletHeader } from './HardwareWalletHeader.tsx';
-import { HardwareWalletInfoNotice } from './HardwareWalletInfoNotice.tsx';
-import { ReceivePanel } from './ReceivePanel.tsx';
-import { VendorSelector } from './VendorSelector.tsx';
-import type { HardwareWalletViewProps } from './viewModel.ts';
+import {AlertMessage} from './AlertMessage.tsx';
+import {ConnectHardwareWalletButton} from './ConnectHardwareWalletButton.tsx';
+import {HardwareAddressSelector} from './HardwareAddressSelector.tsx';
+import {HardwareBalancePanel} from './HardwareBalancePanel.tsx';
+import {HardwareDetailsPanel} from './HardwareDetailsPanel.tsx';
+import {HardwareSendPanel} from './HardwareSendPanel.tsx';
+import {HardwareWalletHeader} from './HardwareWalletHeader.tsx';
+import {HardwareWalletInfoNotice} from './HardwareWalletInfoNotice.tsx';
+import {ReceivePanel} from './ReceivePanel.tsx';
+import {VendorSelector} from './VendorSelector.tsx';
+import type {HardwareWalletViewProps} from './viewModel.ts';
 
-export function HardwareWalletView({ actions, model }: HardwareWalletViewProps) {
+export function HardwareWalletView({actions, model}: HardwareWalletViewProps) {
   return (
     <div className="flex h-full w-full flex-col bg-transparent">
       <HardwareWalletHeader actions={actions} model={model.header} />

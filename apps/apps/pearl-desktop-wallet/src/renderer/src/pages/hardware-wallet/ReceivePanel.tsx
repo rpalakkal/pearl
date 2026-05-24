@@ -1,7 +1,7 @@
-import { CheckCircle2, Copy, Loader2 } from 'lucide-react';
-import { QrcodeCanvas } from 'react-qrcode-pretty';
-import { Button } from '@/components/ui/button';
-import type { HardwareWalletReceiveModel, HardwareWalletViewActions } from './viewModel.ts';
+import {CheckCircle2, Copy, Loader2} from 'lucide-react';
+import {QrcodeCanvas} from 'react-qrcode-pretty';
+import {Button} from '@/components/ui/button';
+import type {HardwareWalletReceiveModel, HardwareWalletViewActions} from './viewModel.ts';
 
 export function ReceivePanel({
   actions,

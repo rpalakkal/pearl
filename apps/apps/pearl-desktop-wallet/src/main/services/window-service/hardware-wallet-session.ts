@@ -1,4 +1,4 @@
-import { type BrowserWindow, type WebFrameMain } from 'electron';
+import {type BrowserWindow, type WebFrameMain} from 'electron';
 import {
   getTrustedHardwareWalletAppOrigins,
   isHardwareWalletDevice,
@@ -20,10 +20,10 @@ function configureHardwareWalletPermissions(
     }
 
     if (details.requestingUrl) {
-      return isHardwareWalletFrameUrl(details.requestingUrl, { allowedAppOrigins });
+      return isHardwareWalletFrameUrl(details.requestingUrl, {allowedAppOrigins});
     }
 
-    return isHardwareWalletOrigin(requestingOrigin, { allowedAppOrigins });
+    return isHardwareWalletOrigin(requestingOrigin, {allowedAppOrigins});
   });
 
   walletSession.setDevicePermissionHandler(details => {
@@ -32,7 +32,7 @@ function configureHardwareWalletPermissions(
     }
 
     return (
-      isHardwareWalletOrigin(details.origin, { allowFileOrigin: true, allowedAppOrigins }) &&
+      isHardwareWalletOrigin(details.origin, {allowFileOrigin: true, allowedAppOrigins}) &&
       isHardwareWalletDevice(details.device as HardwareWalletDeviceIdentity)
     );
   });
@@ -67,7 +67,7 @@ function configureHardwareWalletPermissions(
 }
 
 function isHardwareWalletFrame(frame: WebFrameMain, allowedAppOrigins: readonly string[]): boolean {
-  return isHardwareWalletFrameUrl(frame.url, { allowedAppOrigins });
+  return isHardwareWalletFrameUrl(frame.url, {allowedAppOrigins});
 }
 
-export { configureHardwareWalletPermissions };
+export {configureHardwareWalletPermissions};

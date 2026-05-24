@@ -39,7 +39,7 @@ export function installBrowserNodeProcess(): void {
 
 export async function installBrowserNodeGlobals(): Promise<BufferConstructor> {
   installBrowserNodeProcess();
-  const { Buffer } = await import('buffer');
+  const {Buffer} = await import('buffer');
   (globalThis as unknown as BrowserGlobal).Buffer ??= Buffer;
   return Buffer;
 }

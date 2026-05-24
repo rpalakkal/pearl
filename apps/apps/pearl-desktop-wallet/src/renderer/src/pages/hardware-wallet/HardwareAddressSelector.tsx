@@ -1,4 +1,4 @@
-import { CheckCircle2, ChevronDown, Plus } from 'lucide-react';
+import {CheckCircle2, ChevronDown, Plus} from 'lucide-react';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -6,10 +6,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import type {
-  HardwareWalletAddressSelectorModel,
-  HardwareWalletViewActions,
-} from './viewModel.ts';
+import type {HardwareWalletAddressSelectorModel, HardwareWalletViewActions} from './viewModel.ts';
 
 export function HardwareAddressSelector({
   actions,
