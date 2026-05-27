@@ -14,6 +14,7 @@ categories.workspace = true
 [features]
 default = ["gate_testing", "parallel", "rand_chacha", "std", "timing"]
 gate_testing = []
+icicle = ["std", "dep:icicle-core", "dep:icicle-goldilocks", "dep:icicle-hash", "dep:icicle-runtime"]
 parallel = ["hashbrown/rayon", "plonky2_maybe_rayon/parallel"]
 std = ["anyhow/std", "rand/std", "itertools/use_std"]
 timing = ["std", "dep:web-time"]
@@ -33,6 +34,10 @@ serde = { workspace = true, features = ["rc"] }
 static_assertions = { workspace = true }
 unroll = { workspace = true }
 web-time = { version = "1.0.0", optional = true }
+icicle-core = { path = "../../artifacts/external/icicle/wrappers/rust/icicle-core", optional = true }
+icicle-goldilocks = { path = "../../artifacts/external/icicle/wrappers/rust/icicle-fields/icicle-goldilocks", optional = true }
+icicle-hash = { path = "../../artifacts/external/icicle/wrappers/rust/icicle-hash", optional = true }
+icicle-runtime = { path = "../../artifacts/external/icicle/wrappers/rust/icicle-runtime", optional = true }
 
 # Local dependencies
 plonky2_field = { version = "1.0.0", path = "../field", default-features = false }
@@ -42,6 +47,10 @@ plonky2_util = { version = "1.0.0", path = "../util", default-features = false }
 
 [target.'cfg(all(target_arch = "wasm32", target_os = "unknown"))'.dependencies]
 getrandom = { version = "0.2", default-features = false, features = ["js"] }
+
+[build-dependencies]
+cc = "1.0"
+which = "4.4"
 
 [dev-dependencies]
 criterion = { version = "0.5.1", default-features = false }

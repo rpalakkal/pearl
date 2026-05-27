@@ -16,7 +16,7 @@
 template <class ElementOut_, typename TileShape_MNKR, int KStages_, int cM = 1,
           int cN = 1, bool Is_Even_M = true, bool Is_Even_N = true,
           bool SkipReduction = false, bool SkipDenoising = false,
-          bool EnableDebug = false>
+          bool SkipOutput = false, bool EnableDebug = false>
 void run_pearl_gemm(PearlAPIParams const& params, cudaStream_t stream = 0) {
   using namespace cute;
 
@@ -31,7 +31,8 @@ void run_pearl_gemm(PearlAPIParams const& params, cudaStream_t stream = 0) {
   using KTraits =
       pearl::KernelTraits<ElementIn, ElementOut, ElementDenoise, ElementScale,
                           TileShape_MNKR, Is_Even_M, Is_Even_N, cM, cN,
-                          SkipReduction, SkipDenoising, KStages, EnableDebug>;
+                          SkipReduction, SkipDenoising, SkipOutput, KStages,
+                          EnableDebug>;
   using CollectiveEpilogue = pearl::CollectiveEpilogue<KTraits>;
   typename CollectiveEpilogue::Arguments epilogue_args{
       .ptr_C = static_cast<ElementOut*>(params.ptr_C),
@@ -41,7 +42,8 @@ void run_pearl_gemm(PearlAPIParams const& params, cudaStream_t stream = 0) {
       .ptr_EARxBpEB = static_cast<ElementDenoise*>(params.ptr_EARxBpEB_mma),
       .ptr_AxEBL = static_cast<ElementDenoise*>(params.ptr_AxEBL_mma),
       .ptr_EBR = {},
-      .problem_shape = problem_shape};
+      .problem_shape = problem_shape,
+      .skip_output = params.skip_output};
   epilogue_args.ptr_EAL =
       static_cast<ElementDenoise const*>(params.ptr_EAL_mma);
   epilogue_args.ptr_EBR =

@@ -94,7 +94,21 @@ impl<F: RichField + Extendable<D>, C: GenericConfig<D, F = F>, const D: usize>
             Self::lde_values(&polynomials, rate_bits, blinding, fft_root_table)
         );
 
-        let mut leaves = timed!(timing, "transpose LDEs", transpose(&lde_values));
+        let mut leaves = timed!(timing, "transpose LDEs", {
+            #[cfg(all(feature = "std", pearl_zk_cuda))]
+            {
+                if let Some(leaves) = crate::gpu::transpose::try_transpose_lde::<F, D>(&lde_values)
+                {
+                    leaves
+                } else {
+                    transpose(&lde_values)
+                }
+            }
+            #[cfg(not(all(feature = "std", pearl_zk_cuda)))]
+            {
+                transpose(&lde_values)
+            }
+        });
         reverse_index_bits_in_place(&mut leaves);
         let merkle_tree = timed!(
             timing,
@@ -122,6 +136,15 @@ impl<F: RichField + Extendable<D>, C: GenericConfig<D, F = F>, const D: usize>
         fft_root_table: Option<&FftRootTable<F>>,
     ) -> Vec<Vec<F>> {
         let degree = polynomials[0].len();
+
+        #[cfg(all(feature = "std", feature = "icicle"))]
+        {
+            if let Some(values) =
+                crate::gpu::icicle_ntt::try_lde_values(polynomials, rate_bits, blinding)
+            {
+                return values;
+            }
+        }
 
         // If blinding, salt with two random elements to each leaf vector.
         let salt_size = if blinding { SALT_SIZE } else { 0 };
@@ -248,7 +271,23 @@ impl<F: RichField + Extendable<D>, C: GenericConfig<D, F = F>, const D: usize>
             let lde_final_values = timed!(
                 timing,
                 &format!("perform final FFT {}", lde_final_poly.len()),
-                lde_final_poly.coset_fft(F::coset_shift().into())
+                {
+                    #[cfg(all(feature = "std", feature = "icicle"))]
+                    {
+                        if let Some(values) = crate::gpu::icicle_ntt::try_coset_fft_ext2::<F, D>(
+                            &lde_final_poly,
+                            F::coset_shift(),
+                        ) {
+                            values
+                        } else {
+                            lde_final_poly.coset_fft(F::coset_shift().into())
+                        }
+                    }
+                    #[cfg(not(all(feature = "std", feature = "icicle")))]
+                    {
+                        lde_final_poly.coset_fft(F::coset_shift().into())
+                    }
+                }
             );
             (lde_final_poly, lde_final_values)
         };

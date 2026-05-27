@@ -26,7 +26,7 @@ const IV: [u32; KEY_WORD_COUNT] = [
 ];
 
 /// Segment size for parallel hashing (each chunk = 1KB).
-const CHUNKS_PER_SEGMENT: usize = 64;
+const CHUNKS_PER_SEGMENT: usize = 256;
 const BYTES_PER_SEGMENT: usize = CHUNKS_PER_SEGMENT * CHUNK_LEN;
 
 fn key_to_words(key: &Key) -> [u32; KEY_WORD_COUNT] {

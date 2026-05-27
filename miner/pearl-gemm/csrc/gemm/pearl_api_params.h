@@ -48,6 +48,9 @@ struct PearlAPIParams {
   // PoW target and key (uint256, LE word order)
   void const* __restrict__ ptr_pow_target;  // uint32_t[8]
   void const* __restrict__ ptr_pow_key;     // uint32_t[8]
+
+  // Mining-only mode: preserve noising and PoW reduction but skip C output.
+  bool skip_output;
 };
 
 struct Noise_gen_params {

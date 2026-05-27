@@ -91,7 +91,7 @@ use anyhow::ensure;
 use anyhow::{Result, bail};
 
 use itertools::{Itertools, iproduct};
-use log::{debug, info};
+use log::{Level, debug, info};
 use plonky2::{
     field::{extension::quadratic::QuadraticExtension, goldilocks_field::GoldilocksField, polynomial::PolynomialValues},
     fri::{FriConfig, reduction_strategies::FriReductionStrategy},
@@ -459,6 +459,10 @@ impl RecursionCircuit for PearlRecursion {
         cache: &mut Self::CircuitCache,
         stark_trace: Self::StarkTrace,
     ) -> Result<ZKProof> {
+        fn print_proof_timing() -> bool {
+            std::env::var_os("PEARL_ZK_PRINT_TIMING").is_some_and(|value| value != "0")
+        }
+
         let (trace_rows, stark_public_inputs, hash_public_data) = stark_trace;
         let num_rows = trace_rows.len();
 
@@ -467,15 +471,19 @@ impl RecursionCircuit for PearlRecursion {
         let stark_config = Self::stark_config(circuit_params);
 
         let stark = PearlStark::<Self::F, { Self::EXT_D }>::default();
+        let mut stark_timing = TimingTree::new("stark proof", Level::Debug);
         let (stark_proof, zeta) = prove_and_get_zeta::<Self::F, Self::InnerC, _, { Self::EXT_D }>(
             stark,
             &stark_config,
             trace_rows_to_poly_values(trace_rows),
             &stark_public_inputs,
             None,
-            &mut TimingTree::default(),
+            &mut stark_timing,
             &hash_public_data.elements,
         )?;
+        if print_proof_timing() {
+            stark_timing.print();
+        }
 
         info!("Stark #0 proof time: {:?} || num_rows: {}", stark_timer.elapsed(), num_rows);
 
@@ -521,12 +529,16 @@ impl RecursionCircuit for PearlRecursion {
         }
 
         // Compile proof for verifier circuit #1
+        let mut proof_1_timing = TimingTree::new("recursion proof #1", Level::Debug);
         let proof_1 = plonky2::plonk::prover::prove_maybe_warmup::<Self::F, Self::InnerC, { Self::EXT_D }>(
             &mut first_circuit_data.circuit.prover_only,
             &first_circuit_data.circuit.common,
             pw_1,
-            &mut TimingTree::default(),
+            &mut proof_1_timing,
         )?;
+        if print_proof_timing() {
+            proof_1_timing.print();
+        }
 
         {
             let mut proof_1_bytes = Vec::new();
@@ -580,12 +592,16 @@ impl RecursionCircuit for PearlRecursion {
             pw_2.set_target(*pi_t, *pi)?;
         }
 
+        let mut proof_2_timing = TimingTree::new("recursion proof #2", Level::Debug);
         let proof = plonky2::plonk::prover::prove_maybe_warmup::<Self::F, Self::OuterC, { Self::EXT_D }>(
             &mut second_circuit_data.circuit.prover_only,
             &second_circuit_data.circuit.common,
             pw_2,
-            &mut TimingTree::default(),
+            &mut proof_2_timing,
         )?;
+        if print_proof_timing() {
+            proof_2_timing.print();
+        }
 
         let compact: CompactProofWithPublicInputs<Self::F, Self::OuterC, { Self::EXT_D }> = proof.into();
         let plonky2_proof = compact.to_proof_bytes();

@@ -139,6 +139,7 @@ struct CollectiveEpilogue {
     ElementDenoise const* ptr_AxEBL;
     ElementDenoise const* ptr_EBR;
     ProblemShape problem_shape;
+    bool skip_output;
   };
 
   // Device side kernel params
@@ -166,6 +167,7 @@ struct CollectiveEpilogue {
     LayoutDenoiseT const layout_EBR;
 
     ProblemShape problem_shape;
+    bool skip_output;
   };
 
   static Params to_underlying_arguments(Arguments const& args) {
@@ -212,7 +214,7 @@ struct CollectiveEpilogue {
             tma_load_EARxBpEB, tma_load_AxEBL,    tma_load_EBR,
             layout_C,          layout_A_scales,   layout_B_scales,
             layout_EAL,        layout_EARxBpEB,   layout_AxEBL,
-            layout_EBR,        args.problem_shape};
+            layout_EBR,        args.problem_shape, args.skip_output};
   }
 
   /// Issue Tma Descriptor Prefetch -- ideally from a single thread for best performance
@@ -226,8 +228,10 @@ struct CollectiveEpilogue {
         epilogue_params.tma_load_EAL.get_tma_descriptor());
     cute::prefetch_tma_descriptor(
         epilogue_params.tma_load_EARxBpEB.get_tma_descriptor());
-    cute::prefetch_tma_descriptor(
-        epilogue_params.tma_store.get_tma_descriptor());
+    if constexpr (!KTraits::SkipOutput) {
+      cute::prefetch_tma_descriptor(
+          epilogue_params.tma_store.get_tma_descriptor());
+    }
   }
 
   CUTLASS_DEVICE void load_denoise(

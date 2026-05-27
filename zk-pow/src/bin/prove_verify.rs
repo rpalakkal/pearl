@@ -1,10 +1,3 @@
-#[cfg(unix)]
-use tikv_jemallocator::Jemalloc;
-
-#[cfg(unix)]
-#[global_allocator]
-static GLOBAL: Jemalloc = Jemalloc;
-
 use log::info;
 use rand::rngs::StdRng;
 use rand::{RngCore, SeedableRng};

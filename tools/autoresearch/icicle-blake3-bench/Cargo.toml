@@ -1,0 +1,18 @@
+[package]
+name = "icicle-blake3-bench"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+blake3 = "1.8"
+icicle-core = { path = "../../../artifacts/external/icicle/wrappers/rust/icicle-core" }
+icicle-hash = { path = "../../../artifacts/external/icicle/wrappers/rust/icicle-hash" }
+icicle-runtime = { path = "../../../artifacts/external/icicle/wrappers/rust/icicle-runtime" }
+rayon = "1.10"
+
+[build-dependencies]
+cc = "1.2"
+which = "8.0"
+
+[dev-dependencies]
+plonky2 = { path = "../../../plonky2/plonky2" }

@@ -206,6 +206,19 @@ impl<F: RichField, H: Hasher<F>> MerkleTree<F, H> {
             "cap_height={cap_height} should be at most log2(leaves.len())={log2_leaves_len}"
         );
 
+        #[cfg(all(feature = "std", feature = "icicle", pearl_zk_cuda))]
+        {
+            if let Some((digests, cap)) =
+                crate::gpu::icicle_blake3_merkle::try_build::<F, H>(&leaves, cap_height)
+            {
+                return Self {
+                    leaves,
+                    digests,
+                    cap: MerkleCap(cap),
+                };
+            }
+        }
+
         let num_digests = 2 * (leaves.len() - (1 << cap_height));
         let mut digests = Vec::with_capacity(num_digests);
 

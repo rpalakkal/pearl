@@ -3,10 +3,6 @@
 //! Registers types from pearl-blake3 and zk-pow into a single Python module.
 //! No wrapper types -- all #[pyclass] types are defined in their respective core crates.
 
-#[cfg(unix)]
-#[global_allocator]
-static GLOBAL: tikv_jemallocator::Jemalloc = tikv_jemallocator::Jemalloc;
-
 use lazy_static::lazy_static;
 use pyo3::prelude::*;
 use std::sync::Mutex;
@@ -163,13 +159,17 @@ fn mine(
 // Module
 // ============================================================================
 
-const DEFAULT_RAYON_THREADS: usize = 6;
+const MAX_DEFAULT_RAYON_THREADS: usize = 112;
 
 fn rayon_thread_count() -> usize {
     std::env::var("RAYON_NUM_THREADS")
         .ok()
         .and_then(|s| s.parse().ok())
-        .unwrap_or(DEFAULT_RAYON_THREADS)
+        .unwrap_or_else(|| {
+            std::thread::available_parallelism()
+                .map(|n| n.get().min(MAX_DEFAULT_RAYON_THREADS))
+                .unwrap_or(32)
+        })
 }
 
 #[pymodule]

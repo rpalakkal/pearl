@@ -9,6 +9,7 @@ crate-type = ["rlib"]
 
 [features]
 embedded_cache = [] # embedded verifier cache
+icicle = ["plonky2/icicle"]
 pyo3 = ["dep:pyo3", "pearl-blake3/pyo3"] # Python bindings support
 
 [dependencies]
@@ -42,6 +43,3 @@ rand_chacha = "0.9"
 [profile.devr]
 inherits = "release"
 debug-assertions = true
-
-[target.'cfg(unix)'.dependencies]
-tikv-jemallocator = { version = "0.6", features = ["disable_initial_exec_tls"] }

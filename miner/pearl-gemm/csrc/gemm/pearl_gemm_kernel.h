@@ -61,6 +61,7 @@ __global__ void __launch_bounds__(
   using WorkTileInfo = typename TileScheduler::WorkTileInfo;
   static constexpr bool SkipDenoising = KTraits::SkipDenoising;
   static constexpr bool SkipReduction = KTraits::SkipReduction;
+  static constexpr bool SkipOutput = KTraits::SkipOutput;
 
   extern __shared__ char shared_memory[];
   auto& shared_storage =
@@ -239,25 +240,39 @@ __global__ void __launch_bounds__(
                               block_found_k_tile, consumer_tix, shared_storage,
                               k_tile_count);
 
-      // Convert to float to accumulate denoising
-      Tensor tCrD_fp32 = make_tensor_like<float>(tCrC);
-      CUTLASS_PRAGMA_UNROLL
-      for (int i = 0; i < size(tCrD_fp32); ++i) {
-        tCrD_fp32(i) = static_cast<float>(tCrC(i));
-      }
-
       if constexpr (!SkipDenoising) {
+        // Convert to float to accumulate denoising.
+        Tensor tCrD_fp32 = make_tensor_like<float>(tCrC);
+        CUTLASS_PRAGMA_UNROLL
+        for (int i = 0; i < size(tCrD_fp32); ++i) {
+          tCrD_fp32(i) = static_cast<float>(tCrC(i));
+        }
+
         warpgroup_wait<0>();
         collective_epilogue.denoise(tCrD_fp32, shared_storage, AxEB_pipeline,
                                     EAxBpEB_pipeline, AxEB_pipe_read,
                                     EAxBpEB_pipe_read, consumer_tix);
+
+        if constexpr (!SkipOutput) {
+          collective_epilogue.scale(epilogue_params, tCrD_fp32, shared_storage,
+                                    tiled_mma, consumer_tix, block_coord);
+
+          collective_epilogue.store(epilogue_params, shared_storage,
+                                    consumer_tix, block_coord);
+        }
+      } else if constexpr (!SkipOutput) {
+        Tensor tCrD_fp32 = make_tensor_like<float>(tCrC);
+        CUTLASS_PRAGMA_UNROLL
+        for (int i = 0; i < size(tCrD_fp32); ++i) {
+          tCrD_fp32(i) = static_cast<float>(tCrC(i));
+        }
+
+        collective_epilogue.scale(epilogue_params, tCrD_fp32, shared_storage,
+                                  tiled_mma, consumer_tix, block_coord);
+
+        collective_epilogue.store(epilogue_params, shared_storage,
+                                  consumer_tix, block_coord);
       }
-
-      collective_epilogue.scale(epilogue_params, tCrD_fp32, shared_storage,
-                                tiled_mma, consumer_tix, block_coord);
-
-      collective_epilogue.store(epilogue_params, shared_storage, consumer_tix,
-                                block_coord);
 
       if constexpr (!SkipReduction) {
         local_block_found = check_pow_target(transcript_extraction_tensor,
@@ -273,7 +288,9 @@ __global__ void __launch_bounds__(
         }
       }
 
-      collective_epilogue.store_tail();
+      if constexpr (!SkipOutput) {
+        collective_epilogue.store_tail();
+      }
       work_tile_info = scheduler.template get_next_work</*IsProducer=*/false>(
           scheduler_params, work_tile_info);
     }

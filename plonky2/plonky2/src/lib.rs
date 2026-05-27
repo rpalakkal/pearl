@@ -20,5 +20,11 @@ pub mod plonk;
 pub mod recursion;
 pub mod util;
 
+#[cfg(any(
+    all(feature = "std", pearl_zk_cuda),
+    all(feature = "std", feature = "icicle")
+))]
+pub(crate) mod gpu;
+
 #[cfg(test)]
 mod lookup_test;

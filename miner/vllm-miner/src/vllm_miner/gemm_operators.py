@@ -24,6 +24,17 @@ from .mining_state import (
 
 _LOGGER = get_logger("vllm.pearl_miner")
 
+TENSOR_HASH_THREADS = 512
+TENSOR_HASH_STAGES = 2
+TENSOR_HASH_LEAVES_PER_BLOCK = 512
+
+
+def _int8_tensor_hash_view(tensor: torch.Tensor) -> torch.Tensor:
+    """Return a uint8 byte view for hashing when it is safe to avoid a copy."""
+    if tensor.dtype == torch.int8 and tensor.is_contiguous():
+        return tensor.view(torch.uint8)
+    return tensor.to(torch.uint8)
+
 
 def pearl_gemm_vanilla(
     A: torch.Tensor,
@@ -103,7 +114,7 @@ def pearl_gemm_noisy(
 
     matrix_bytes = max(m * k, n * k)
     tensor_hash_scratchpad = torch.empty(
-        get_required_scratchpad_bytes(matrix_bytes),
+        get_required_scratchpad_bytes(matrix_bytes, TENSOR_HASH_THREADS),
         dtype=torch.uint8,
         device=a.device,
     )
@@ -123,18 +134,24 @@ def pearl_gemm_noisy(
 
     A_tensor_hash = torch.empty(32, device="cuda", dtype=torch.uint8)
     tensor_hash(
-        A.to(torch.uint8),
+        _int8_tensor_hash_view(A),
         key_tensor,
         A_tensor_hash,
         tensor_hash_scratchpad,
+        threads_per_block=TENSOR_HASH_THREADS,
+        num_stages=TENSOR_HASH_STAGES,
+        leaves_per_mt_block=TENSOR_HASH_LEAVES_PER_BLOCK,
     )
 
     B_tensor_hash = torch.empty(32, device="cuda", dtype=torch.uint8)
     tensor_hash(
-        B.to(torch.uint8),
+        _int8_tensor_hash_view(B),
         key_tensor,
         B_tensor_hash,
         tensor_hash_scratchpad,
+        threads_per_block=TENSOR_HASH_THREADS,
+        num_stages=TENSOR_HASH_STAGES,
+        leaves_per_mt_block=TENSOR_HASH_LEAVES_PER_BLOCK,
     )
 
     # Generate commitment hash for noise generation

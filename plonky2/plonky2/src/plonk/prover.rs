@@ -741,6 +741,24 @@ fn compute_quotient_polys<
     let has_lookup = common_data.num_lookup_polys != 0;
 
     let quotient_degree_bits = log2_ceil(common_data.quotient_degree_factor);
+    if std::env::var_os("PEARL_ZK_PLONK_SHAPE_LOG").is_some() {
+        eprintln!(
+            "pearl_zk_plonk_shape degree_bits={} rate_bits={} degree={} quotient_degree_factor={} quotient_degree_bits={} num_challenges={} num_gate_constraints={} num_constants={} num_routed_wires={} num_wires={} num_partial_products={} num_lookup_polys={} num_all_lookup_polys={}",
+            common_data.degree_bits(),
+            common_data.config.fri_config.rate_bits,
+            common_data.degree(),
+            common_data.quotient_degree_factor,
+            quotient_degree_bits,
+            common_data.config.num_challenges,
+            common_data.num_gate_constraints,
+            common_data.num_constants,
+            common_data.config.num_routed_wires,
+            common_data.config.num_wires,
+            common_data.num_partial_products,
+            common_data.num_lookup_polys,
+            common_data.num_all_lookup_polys(),
+        );
+    }
     assert!(
         quotient_degree_bits <= common_data.config.fri_config.rate_bits,
         "Having constraints of degree higher than the rate is not supported yet. \

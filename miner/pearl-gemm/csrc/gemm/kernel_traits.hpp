@@ -16,7 +16,7 @@ using namespace cute;
 template <typename ElementIn_, typename ElementOut_, typename ElementDenoise_,
           typename ElementScale_, typename TileShape_MNKR_, bool Is_Even_M_,
           bool Is_Even_N_, int cM_, int cN_, bool SkipReduction_,
-          bool SkipDenoising_, int kStages_, bool EnableDebug_>
+          bool SkipDenoising_, bool SkipOutput_, int kStages_, bool EnableDebug_>
 struct KernelTraits {
 
   using ElementIn = ElementIn_;
@@ -33,6 +33,7 @@ struct KernelTraits {
   static constexpr bool Is_Even_N = Is_Even_N_;
   static constexpr bool SkipReduction = SkipReduction_;
   static constexpr bool SkipDenoising = SkipDenoising_;
+  static constexpr bool SkipOutput = SkipOutput_;
   static constexpr int kStages = kStages_;
   static constexpr bool EnableDebug = EnableDebug_;
   static constexpr int srcLane = 0;
@@ -264,9 +265,27 @@ struct KernelTraits {
     };
   };
 
-  using SharedStorage =
+  struct SharedStorageNoDenoiseNoOutput : cute::aligned_struct<128> {
+    struct {
+      cute::array_aligned<ElementIn, cute::cosize_v<SmemLayoutA>,
+                          cutlass::detail::alignment_for_swizzle(SmemLayoutA{})>
+          smem_A;
+      cute::array_aligned<ElementIn, cute::cosize_v<SmemLayoutB>,
+                          cutlass::detail::alignment_for_swizzle(SmemLayoutB{})>
+          smem_B;
+    };
+
+    struct {
+      typename MainloopPipeline::SharedStorage pipeline;
+      typename DenoisePipeline::SharedStorage AxEB_pipeline;
+      typename DenoisePipeline::SharedStorage EAxBpEB_pipeline;
+    };
+  };
+
+  using SharedStorage = cute::conditional_t<
+      SkipDenoising && SkipOutput, SharedStorageNoDenoiseNoOutput,
       cute::conditional_t<SkipDenoising, SharedStorageNoDenoise,
-                          SharedStorageDenoise>;
+                          SharedStorageDenoise>>;
 };
 
 }  // namespace pearl

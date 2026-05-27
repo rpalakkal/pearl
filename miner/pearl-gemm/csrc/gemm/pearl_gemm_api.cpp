@@ -381,6 +381,7 @@ void noise_A(at::Tensor& A,                          // m x k
   params.inner_hash_counter = nullptr;
   params.ptr_pow_target = nullptr;
   params.ptr_pow_key = nullptr;
+  params.skip_output = false;
 
   auto stream = at::cuda::getCurrentCUDAStream().stream();
 
@@ -482,6 +483,7 @@ void noise_B(at::Tensor& B,                          // n x k
   params.inner_hash_counter = nullptr;
   params.ptr_pow_target = nullptr;
   params.ptr_pow_key = nullptr;
+  params.skip_output = false;
 
   auto stream = at::cuda::getCurrentCUDAStream().stream();
 
@@ -589,10 +591,12 @@ void gemm(at::Tensor& A,         // m x k
 
   params.ptr_pow_target = nullptr;
   params.ptr_pow_key = nullptr;
+  params.skip_output = false;
 
   auto stream = at::cuda::getCurrentCUDAStream().stream();
   constexpr bool SkipReduction = true;
   constexpr bool SkipDenoising = true;
+  constexpr bool SkipOutput = false;
   constexpr bool EnableDebug = false;
 
   // Awkwardly, the template signature and thus the existence of a compatible kernel
@@ -603,8 +607,8 @@ void gemm(at::Tensor& A,         // m x k
     MATMUL_CONFIG_SWITCH(
         bM, bN, bK, R, pipeline_stages, cM, cN, kernel_found = true;
         run_pearl_gemm_<ElementOut, R_, bM_, bN_, bK_, stages_, cM_, cN_,
-                        SkipReduction, SkipDenoising, EnableDebug>(params,
-                                                                   stream);
+                        SkipReduction, SkipDenoising, SkipOutput,
+                        EnableDebug>(params, stream);
         goto done;);
   }
 
@@ -653,6 +657,7 @@ void noisy_gemm(
     std::optional<int64_t> k_blocks_per_split_noising_B_ = std::nullopt,
     bool run_noising_a = true, bool run_noising_b = true,
     bool skip_reduction = false, bool skip_denoising = false,
+    bool skip_output = false,
     std::optional<at::Tensor> inner_hash_counter = std::nullopt,
     bool enable_debug = false) {
   auto dprops = at::cuda::getCurrentDeviceProperties();
@@ -777,6 +782,37 @@ void noisy_gemm(
         n, tile_size_n_noising_B, k, tile_size_k_noising_B, dprops);
   }
 
+  bool const use_large_k_mining_split =
+      m >= 8192 && n <= 4096 && k >= 8192 &&
+      k % kDefaultNoisingTileSizeK == 0;
+  bool const use_large_m_k4096_mining_split =
+      m >= 8192 && n <= 4096 && k == 4096;
+  bool const use_4096_square_large_k_mining_split =
+      m == 4096 && n == 4096 && k >= 8192 &&
+      k % kDefaultNoisingTileSizeK == 0;
+  bool const use_4096_high_n_large_k_mining_split =
+      m == 4096 && n >= 8192 && k >= 8192 &&
+      k % kDefaultNoisingTileSizeK == 0;
+  if (skip_denoising && skip_output &&
+      (k == 2048 || k == 4096 || use_large_k_mining_split ||
+       use_4096_square_large_k_mining_split ||
+       use_4096_high_n_large_k_mining_split)) {
+    int const mining_split_k_blocks = (k == 2048) ? 8 : (k / 128);
+    bool const b_only_large_k_projection_split =
+        use_large_k_mining_split || use_large_m_k4096_mining_split;
+    if (!k_blocks_per_split_noising_A_.has_value() &&
+        AxEBL_noising_dtype == torch::kInt32 &&
+        tile_size_k_noising_A == kDefaultNoisingTileSizeK) {
+      k_blocks_per_split_noising_A =
+          b_only_large_k_projection_split ? 0 : mining_split_k_blocks;
+    }
+    if (!k_blocks_per_split_noising_B_.has_value() &&
+        EARxBpEB_noising_dtype == torch::kInt32 &&
+        tile_size_k_noising_B == kDefaultNoisingTileSizeK) {
+      k_blocks_per_split_noising_B = mining_split_k_blocks;
+    }
+  }
+
   if (k_blocks_per_split_noising_A > 0) {
     TORCH_CHECK(AxEBL_noising_dtype == torch::kInt32,
                 "AxEBL should have int32 dtype for split-K. It currently has ",
@@ -807,6 +843,18 @@ void noisy_gemm(
 
   if (swizzle.has_value()) {
     params.swizzle = static_cast<int>(swizzle.value());
+  } else if (skip_output) {
+    bool const use_mid_m_large_k_mining_swizzle =
+        m >= 6144 && n >= 4096 && k >= 8192;
+    bool const use_large_m_wide_or_large_k_mining_swizzle =
+        m >= 8192 && k >= 4096 && (n >= 8192 || k >= 8192);
+    bool const use_large_m_k4096_mining_swizzle =
+        m >= 8192 && k == 4096;
+    params.swizzle = use_large_m_wide_or_large_k_mining_swizzle ||
+                             use_mid_m_large_k_mining_swizzle ||
+                             use_large_m_k4096_mining_swizzle
+                         ? 4
+                         : 1;
   } else {
     int b_maj = swizzle_n_maj ? bN : bM;
     params.swizzle = get_swizzle_size(params.k, b_maj, dprops);
@@ -855,6 +903,7 @@ void noisy_gemm(
   // PoW target and key
   params.ptr_pow_target = pow_target.data_ptr();
   params.ptr_pow_key = pow_key.data_ptr();
+  params.skip_output = skip_output;
 
   // Validate that inner_hash_counter is provided when enable_debug is true
   TORCH_CHECK(!enable_debug || params.inner_hash_counter != nullptr,
@@ -875,6 +924,8 @@ void noisy_gemm(
           skip_reduction, SkipReduction,
           SKIP_DENOISING_SWITCH(
               skip_denoising, SkipDenoising,
+              SKIP_OUTPUT_SWITCH(
+                  skip_output, SkipOutput,
 
               if (run_noising_a) {
                 NOISING_A_CONFIG_SWITCH(
@@ -910,7 +961,8 @@ void noisy_gemm(
                                      run_pearl_gemm_<
                                          ElementOut, R_, bM_, bN_, bK_, stages_,
                                          cM_, cN_, SkipReduction, SkipDenoising,
-                                         EnableDebug>(params, stream);););););
+                                         SkipOutput, EnableDebug>(
+                                             params, stream););););););
 
   TORCH_CHECK(kernel_found_matmul,
               "No noisy_gemm kernel found with given config: ", "bM = ", bM,
@@ -1194,6 +1246,7 @@ TORCH_LIBRARY(pearl_gemm, m) {
       "    bool run_noising_B = False, "
       "    bool skip_reduction = True, "
       "    bool skip_denoising = False, "
+      "    bool skip_output = False, "
       "    Tensor(inner_hash_counter!)? inner_hash_counter = None, "
       "    bool enable_debug = False"
       ") -> ()",
