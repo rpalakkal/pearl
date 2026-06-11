@@ -180,5 +180,18 @@ async function openLedgerTransport(
     }
   }
 
-  return TransportWebHID.request();
+  try {
+    return await TransportWebHID.request();
+  } catch (error) {
+    if (isLedgerMissingSelectedDeviceError(error)) {
+      throw new Error('Access denied to use Ledger device');
+    }
+
+    throw error;
+  }
+}
+
+function isLedgerMissingSelectedDeviceError(error: unknown): boolean {
+  const message = error instanceof Error ? error.message : String(error || '');
+  return message.includes("Cannot read properties of undefined (reading 'open')");
 }

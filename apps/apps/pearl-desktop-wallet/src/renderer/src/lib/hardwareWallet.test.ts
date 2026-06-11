@@ -288,6 +288,13 @@ test('maps common device access errors to actionable hardware wallet messages', 
     'No Ledger was selected. Connect and unlock the device, open the Bitcoin app, then try again.'
   );
   assert.equal(
+    getHardwareWalletErrorMessage(
+      new Error("Cannot read properties of undefined (reading 'open')"),
+      'ledger'
+    ),
+    'No Ledger was selected. Connect and unlock the device, open the Bitcoin app, then try again.'
+  );
+  assert.equal(
     getHardwareWalletErrorMessage(new Error('Access denied to use Trezor device'), 'trezor'),
     'No Trezor was selected. Connect and unlock the device, then try again.'
   );

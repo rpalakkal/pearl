@@ -58,7 +58,8 @@ export function getHardwareWalletErrorMessage(
     normalizedMessage.includes('access denied') ||
     normalizedMessage.includes('cancel') ||
     normalizedMessage.includes('no device') ||
-    normalizedMessage.includes('user gesture')
+    normalizedMessage.includes('user gesture') ||
+    (vendor === 'ledger' && normalizedMessage.includes("reading 'open'"))
   ) {
     return vendor === 'ledger'
       ? 'No Ledger was selected. Connect and unlock the device, open the Bitcoin app, then try again.'

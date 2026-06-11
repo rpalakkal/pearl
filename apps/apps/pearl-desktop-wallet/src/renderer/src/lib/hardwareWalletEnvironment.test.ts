@@ -300,6 +300,10 @@ test('wires Electron HID and USB permission handlers for hardware wallets', () =
     hardwareWalletSessionSource,
     /isHardwareWalletFrameUrl\(details\.requestingUrl,\s*\{\s*allowedAppOrigins\s*\}\)/
   );
+  assert.match(
+    hardwareWalletSessionSource,
+    /isHardwareWalletOrigin\(requestingOrigin,\s*\{\s*allowFileOrigin:\s*true,\s*allowedAppOrigins/
+  );
   assert.match(hardwareWalletSessionSource, /setDevicePermissionHandler/);
   assert.match(hardwareWalletSessionSource, /allowFileOrigin: true/);
   assert.match(hardwareWalletSessionSource, /select-hid-device/);
