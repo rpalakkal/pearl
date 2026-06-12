@@ -1,5 +1,6 @@
 import {secp256k1, schnorr} from '@noble/curves/secp256k1.js';
 import {sha256} from '@noble/hashes/sha2.js';
+import {concatBytes} from '@noble/hashes/utils.js';
 import {bech32m} from 'bech32';
 import {networkConfig} from './constants.ts';
 import type {PearlNetwork} from './types.ts';
@@ -161,17 +162,4 @@ function taprootOutputKey(internalPubkey: Uint8Array, tweakBytes: Uint8Array): U
 
 function taggedHash(tagHash: Uint8Array, message: Uint8Array): Uint8Array {
   return sha256(concatBytes(tagHash, tagHash, message));
-}
-
-function concatBytes(...arrays: Uint8Array[]): Uint8Array {
-  const length = arrays.reduce((total, array) => total + array.length, 0);
-  const result = new Uint8Array(length);
-  let offset = 0;
-
-  for (const array of arrays) {
-    result.set(array, offset);
-    offset += array.length;
-  }
-
-  return result;
 }

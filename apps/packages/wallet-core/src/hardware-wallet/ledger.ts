@@ -1,6 +1,6 @@
 import {derivePearlTaprootAddress, getBitcoinDeviceDisplayAddress} from './address.ts';
 import {validateHardwareWalletDeviceAccount} from './account.ts';
-import {ensureHardwareWalletBuffer, ensureHardwareWalletBrowserGlobals} from './browser.ts';
+import {ensureHardwareWalletBrowserGlobals} from './browser.ts';
 import {isLedgerUnsupportedTaprootAddressError} from './errors.ts';
 import {getLedgerCurrency} from './paths.ts';
 import {
@@ -56,7 +56,7 @@ export async function signLedgerPearlTransaction(
     throw new Error('Ledger signing requested for a non-Ledger account.');
   }
 
-  const Buffer = await ensureHardwareWalletBuffer();
+  const Buffer = await ensureHardwareWalletBrowserGlobals();
   const TransportWebHID = await getLedgerTransportWebHID();
   const transport = await openLedgerTransport(TransportWebHID, true);
   try {

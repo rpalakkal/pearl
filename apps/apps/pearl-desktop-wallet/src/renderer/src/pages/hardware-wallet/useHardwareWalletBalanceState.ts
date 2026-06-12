@@ -1,4 +1,5 @@
 import {useRef, useState} from 'react';
+import {getErrorMessage} from '../../lib/utils.ts';
 import type {HardwareWalletAddress, PearlNetwork} from '../../lib/hardwareWallet.ts';
 import type {BlockbookAddressInfo, BlockbookUtxo} from '../../../../types/app-bridge.ts';
 import {
@@ -69,9 +70,7 @@ export function useHardwareWalletBalanceState(fetchBalanceData: FetchHardwareWal
         },
         'error'
       );
-      setBalanceError(
-        error instanceof Error ? error.message : 'Unable to load hardware wallet balance.'
-      );
+      setBalanceError(getErrorMessage(error, 'Unable to load hardware wallet balance.'));
     } finally {
       if (requestId === balanceRequestIdRef.current) {
         setIsLoadingBalance(false);

@@ -18,10 +18,6 @@ export async function loadBitcoinJs() {
   return import('bitcoinjs-lib');
 }
 
-export async function ensureHardwareWalletBuffer(): Promise<BufferConstructor> {
-  return installBrowserNodeGlobals();
-}
-
 export async function ensureHardwareWalletBrowserGlobals(): Promise<BufferConstructor> {
   return installBrowserNodeGlobals();
 }

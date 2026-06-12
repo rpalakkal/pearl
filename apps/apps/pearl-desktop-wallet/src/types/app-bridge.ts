@@ -7,6 +7,10 @@ import {
   SaveDialogReturnValue,
 } from 'electron';
 import type {Transaction} from './transaction';
+import type {
+  BlockbookAddressInfo,
+  BlockbookUtxo,
+} from '../main/clients/blockbook-normalizers.ts';
 
 type PromisifyInterface<T> = {
   [K in keyof T]: T[K] extends (...args: infer A) => infer R
@@ -51,24 +55,6 @@ interface WalletApi {
   validateAddress: (address: string) => Promise<{isValid: boolean}>;
 
   estimateFee: (numBlocks: number, network?: AppNetwork) => Promise<number>;
-}
-
-interface BlockbookAddressInfo {
-  address: string;
-  balance: string;
-  totalReceived: string;
-  totalSent: string;
-  unconfirmedBalance: string;
-  unconfirmedTxs: number;
-  txs: number;
-}
-
-interface BlockbookUtxo {
-  txid: string;
-  vout: number;
-  value: string;
-  height?: number;
-  confirmations?: number;
 }
 
 interface HardwareWalletBalance {

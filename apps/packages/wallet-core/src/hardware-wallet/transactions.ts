@@ -20,7 +20,7 @@ import {
   xOnlyPublicKeyFromHex,
 } from './address.ts';
 import {validateHardwareWalletAccount} from './account.ts';
-import {ensureHardwareWalletBuffer, loadBitcoinJs} from './browser.ts';
+import {ensureHardwareWalletBrowserGlobals, loadBitcoinJs} from './browser.ts';
 import {getAccountPathFromAddressPath, getTrezorCoin, parseBip32Path} from './paths.ts';
 import type {
   HardwarePearlSendPlan,
@@ -89,7 +89,7 @@ export async function buildPearlSendPlan(
     request.amountSats,
     request.feeRatePrlPerKb
   );
-  const Buffer = await ensureHardwareWalletBuffer();
+  const Buffer = await ensureHardwareWalletBrowserGlobals();
   const bitcoin = await loadBitcoinJs();
   const psbt = new bitcoin.Psbt({network: bitcoin.networks.bitcoin});
   psbt.setVersion(HARDWARE_TRANSACTION_VERSION);
@@ -139,7 +139,7 @@ export async function buildLedgerSignPsbtOptions(
     throw new Error('Ledger signing requested for a non-Ledger account.');
   }
 
-  const Buffer = await ensureHardwareWalletBuffer();
+  const Buffer = await ensureHardwareWalletBrowserGlobals();
 
   return {
     finalizePsbt: true,
@@ -299,7 +299,7 @@ export async function validateSignedHardwareTransaction(
     throw new Error('Signed transaction fee does not match the send plan.');
   }
 
-  const Buffer = await ensureHardwareWalletBuffer();
+  const Buffer = await ensureHardwareWalletBrowserGlobals();
   const prevOutScripts = plan.selectedUtxos.map(() => Buffer.from(sourceScript));
   const prevOutValues = plan.selectedUtxos.map((utxo, index) =>
     bigintToSafeNumber(parseUtxoValue(utxo), `UTXO ${index} value`)

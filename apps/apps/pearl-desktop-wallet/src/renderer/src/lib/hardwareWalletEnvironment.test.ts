@@ -145,7 +145,7 @@ test('installs the Buffer polyfill before loading browser hardware dependencies'
   assert.match(browserSource, /type BufferConstructor = typeof import\('buffer'\)\.Buffer/);
   assert.match(
     browserSource,
-    /async function ensureHardwareWalletBuffer\(\): Promise<BufferConstructor>/
+    /async function ensureHardwareWalletBrowserGlobals\(\): Promise<BufferConstructor>/
   );
   assert.match(browserSource, /installBrowserNodeGlobals\(\)/);
   assert.match(browserGlobalsSource, /type BrowserProcessShim =/);

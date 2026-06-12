@@ -50,7 +50,6 @@ import {
   sendHardwareTransactionWorkflow,
 } from './sendWorkflow.ts';
 import {useHardwareSendFormState} from './useHardwareSendFormState.ts';
-import {buildHardwareWalletViewProps} from './buildHardwareWalletViewProps.ts';
 import {useHardwareWalletBalanceState} from './useHardwareWalletBalanceState.ts';
 import {useHardwareWalletOperationState} from './useHardwareWalletOperationState.ts';
 import type {HardwareWalletBalanceData} from './balanceData.ts';
@@ -167,19 +166,21 @@ export function useHardwareWalletController(): HardwareWalletViewProps {
   const hasPendingOutgoingHardwareSpend = useMemo(() => {
     return hasPendingOutgoingHardwareTransaction(addressInfo);
   }, [addressInfo]);
-  const spendableBalanceSats = useMemo(() => {
-    if (hasPendingOutgoingHardwareSpend) {
-      return 0n;
+  const {spendableBalanceSats, spendableUtxoCount} = useMemo(() => {
+    let balance = 0n;
+    let count = 0;
+
+    if (!hasPendingOutgoingHardwareSpend) {
+      for (const utxo of utxos) {
+        const value = getSpendableHardwareUtxoValue(utxo);
+        if (value > 0n) {
+          balance += value;
+          count += 1;
+        }
+      }
     }
 
-    return utxos.reduce((total, utxo) => total + getSpendableHardwareUtxoValue(utxo), 0n);
-  }, [hasPendingOutgoingHardwareSpend, utxos]);
-  const spendableUtxoCount = useMemo(() => {
-    if (hasPendingOutgoingHardwareSpend) {
-      return 0;
-    }
-
-    return utxos.filter(utxo => getSpendableHardwareUtxoValue(utxo) > 0n).length;
+    return {spendableBalanceSats: balance, spendableUtxoCount: count};
   }, [hasPendingOutgoingHardwareSpend, utxos]);
   const pendingBalanceSats = useMemo(() => {
     return getHardwareBalanceSats(addressInfo?.unconfirmedBalance);
@@ -662,46 +663,77 @@ export function useHardwareWalletController(): HardwareWalletViewProps {
     },
   };
 
-  return buildHardwareWalletViewProps({
+  return {
     actions,
-    activeSendNetwork,
-    addressSelectorOptions,
-    balanceError,
-    connectedLabel,
-    copiedAddress,
-    derivationPath,
-    deviceDisplayAddress,
-    errorMessage,
-    feeRate,
-    hardwareAddress,
-    hasPendingDeviceOperation,
-    isConnecting,
-    isLoadingBalance,
-    isRememberedAccount,
-    isSending,
-    isVerifyingAddress,
-    lastSendFee,
-    networkDisplayName: networkInfo?.networkConfig.displayName ?? 'Mainnet',
-    nextAddressIndex,
-    pendingBalanceIsOutgoing,
-    pendingBalanceLabel,
-    pendingBalanceNotice,
-    pendingBalanceValue,
-    receiveDeviceDisplayAddress,
-    selectedAddressIndex,
-    selectedAddressPath,
-    selectedAddressSummary,
-    selectedLabel,
-    selectedVendor,
-    sendAddress,
-    sendAmount,
-    sendError,
-    sendPreview,
-    sendSuccess,
-    spendableBalanceSats,
-    spendableUtxoCount,
-    vendors,
-    verifiedDeviceAddress,
-    verifyError,
-  });
+    model: {
+      addressSelector: {
+        hasPendingDeviceOperation,
+        nextAddressIndex,
+        options: addressSelectorOptions,
+        selectedAddressIndex,
+        selectedAddressPath,
+        selectedAddressSummary,
+      },
+      connectedWallet: hardwareAddress
+        ? {
+            balance: {
+              balanceError,
+              hardwareAddress,
+              hasPendingDeviceOperation,
+              isLoadingBalance,
+              pendingBalanceIsOutgoing,
+              pendingBalanceLabel,
+              pendingBalanceNotice,
+              pendingBalanceValue,
+              spendableBalanceSats,
+              spendableUtxoCount,
+            },
+            details: {
+              connectedLabel,
+              hardwareAddress,
+              isRememberedAccount,
+            },
+            receive: {
+              connectedLabel,
+              copiedAddress,
+              hardwareAddress,
+              hasPendingDeviceOperation,
+              isVerifyingAddress,
+              receiveDeviceDisplayAddress,
+              verifiedDeviceAddress,
+              verifyError,
+            },
+            send: {
+              activeSendNetwork,
+              connectedLabel,
+              deviceDisplayAddress,
+              feeRate,
+              hasPendingDeviceOperation,
+              isSending,
+              lastSendFee,
+              sendAddress,
+              sendAmount,
+              sendError,
+              sendPreview,
+              sendSuccess,
+            },
+          }
+        : null,
+      connection: {
+        errorMessage,
+        isConnecting,
+      },
+      header: {
+        derivationPath,
+        hasPendingDeviceOperation,
+        networkDisplayName: networkInfo?.networkConfig.displayName ?? 'Mainnet',
+      },
+      vendor: {
+        hasPendingDeviceOperation,
+        selectedLabel,
+        selectedVendor,
+        vendors,
+      },
+    },
+  };
 }

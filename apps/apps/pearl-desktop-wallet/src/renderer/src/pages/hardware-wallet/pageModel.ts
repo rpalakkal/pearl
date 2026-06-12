@@ -5,6 +5,7 @@ import {
   type HardwarePearlSendPreview,
   type HardwareWalletAddress,
 } from '../../lib/hardwareWallet.ts';
+import {getErrorMessage} from '../../lib/utils.ts';
 import type {BlockbookAddressInfo, BlockbookUtxo} from '../../../../types/app-bridge.ts';
 
 type HardwareWalletLogLevel = 'info' | 'warn' | 'error';
@@ -104,20 +105,25 @@ export function hardwareBalanceLogContext(
 ): HardwareWalletLogDetails {
   const hasPendingOutgoingSpend = hasPendingOutgoingHardwareTransaction(info);
   const pendingUtxos = addressUtxos.filter(isPendingHardwareUtxo);
-  const spendableUtxos = hasPendingOutgoingSpend
-    ? []
-    : addressUtxos.filter(utxo => getSpendableHardwareUtxoValue(utxo) > 0n);
-  const spendableSats = spendableUtxos.reduce(
-    (total, utxo) => total + getSpendableHardwareUtxoValue(utxo),
-    0n
-  );
+  let spendableSats = 0n;
+  let spendableUtxoCount = 0;
+
+  if (!hasPendingOutgoingSpend) {
+    for (const utxo of addressUtxos) {
+      const value = getSpendableHardwareUtxoValue(utxo);
+      if (value > 0n) {
+        spendableSats += value;
+        spendableUtxoCount += 1;
+      }
+    }
+  }
 
   return {
     balance: formatSatsAsPearl(info.balance),
     unconfirmed: formatSatsAsPearl(info.unconfirmedBalance),
     spendable: formatSatsAsPearl(spendableSats),
     utxos: addressUtxos.length,
-    spendableUtxos: spendableUtxos.length,
+    spendableUtxos: spendableUtxoCount,
     pendingUtxos: pendingUtxos.length,
     pendingOutgoing: hasPendingOutgoingSpend,
   };
@@ -143,7 +149,7 @@ export function compactHardwareAddress(value: string): string {
 }
 
 export function getErrorLogMessage(error: unknown): string {
-  return error instanceof Error ? error.message : String(error || 'Unknown error');
+  return getErrorMessage(error, 'Unknown error');
 }
 
 export function sendPreviewsEqual(
