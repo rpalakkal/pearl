@@ -54,18 +54,50 @@ interface WalletApi {
 
   validateAddress: (address: string) => Promise<{isValid: boolean}>;
 
+  getAddressesByAccount: (account?: string) => Promise<string[]>;
+
   estimateFee: (numBlocks: number, network?: AppNetwork) => Promise<number>;
 }
+
+interface Contact {
+  id: string;
+  name: string;
+  address: string;
+  createdAt: number;
+  updatedAt: number;
+}
+
+interface ContactsApi {
+  list: () => Promise<Contact[]>;
+
+  add: (name: string, address: string) => Promise<Contact>;
+
+  update: (id: string, updates: {name?: string; address?: string}) => Promise<Contact>;
+
+  remove: (id: string) => Promise<void>;
+}
+
+// Which backend served a hardware wallet balance read: the local Oyster
+// wallet, or the external indexer used in hardware-only mode.
+type HardwareBalanceSource = 'oyster' | 'indexer';
 
 interface HardwareWalletBalance {
   info: BlockbookAddressInfo;
   utxos: BlockbookUtxo[];
+  source: HardwareBalanceSource;
+}
+
+interface HardwareWalletAccountRequest {
+  address: string;
+  publicKey: string;
+  network?: AppNetwork;
 }
 
 interface HardwareWalletBroadcastRequest {
   network?: AppNetwork;
   rawTransactionHex: string;
   sourceAddress: string;
+  sourcePublicKey: string;
 }
 
 interface HardwareWalletBroadcastResult {
@@ -74,7 +106,7 @@ interface HardwareWalletBroadcastResult {
 }
 
 interface HardwareWalletApi {
-  getBalance: (address: string, network?: AppNetwork) => Promise<HardwareWalletBalance>;
+  getBalance: (request: HardwareWalletAccountRequest) => Promise<HardwareWalletBalance>;
 
   broadcastTransaction: (
     request: HardwareWalletBroadcastRequest
@@ -186,6 +218,7 @@ interface AppBridge {
   window: Ipc<WindowApi>;
   wallet: Ipc<WalletApi>;
   hardwareWallet: Ipc<HardwareWalletApi>;
+  contacts: Ipc<ContactsApi>;
   manager: Ipc<ManagerApi>;
   sync: Ipc<SyncApi>;
   update: UpdateApi;
@@ -196,9 +229,13 @@ export type {
   WindowApi,
   WalletApi,
   HardwareWalletApi,
+  HardwareBalanceSource,
   HardwareWalletBalance,
+  HardwareWalletAccountRequest,
   HardwareWalletBroadcastRequest,
   HardwareWalletBroadcastResult,
+  Contact,
+  ContactsApi,
   ManagerApi,
   SyncApi,
   SyncProgress,

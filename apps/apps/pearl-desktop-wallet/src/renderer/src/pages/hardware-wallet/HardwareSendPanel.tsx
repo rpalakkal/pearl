@@ -1,6 +1,7 @@
 import {Loader2, Send} from 'lucide-react';
 import {Button} from '@/components/ui/button';
 import {formatSatsAsPearl} from '../../lib/hardwareWallet.ts';
+import {AddressBookControl} from '../../components/contact-book/AddressBookControl.tsx';
 import {AlertMessage} from './AlertMessage.tsx';
 import type {HardwareWalletSendModel, HardwareWalletViewActions} from './viewModel.ts';
 
@@ -47,6 +48,12 @@ export function HardwareSendPanel({
               className="focus:border-brand-green mt-1 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 font-mono text-sm text-gray-900 outline-none transition-colors"
             />
           </label>
+
+          <AddressBookControl
+            address={model.sendAddress}
+            onSelect={actions.setSendAddress}
+            disabled={model.hasPendingDeviceOperation}
+          />
 
           {model.deviceDisplayAddress && (
             <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900">

@@ -1,4 +1,5 @@
 import { AlertCircle } from 'lucide-react';
+import { AddressBookControl } from '../../components/contact-book/AddressBookControl';
 
 type AddressInputProps = {
   address: string;
@@ -19,6 +20,7 @@ export default function AddressInput({ address, onChange, error, onBlur }: Addre
         placeholder="Insert a recpipient address"
         className="focus:border-brand-green focus:ring-brand-green/20 w-full rounded-lg border border-gray-300 bg-white px-4 py-3 font-mono text-sm text-gray-900 placeholder-gray-400 shadow-sm focus:outline-none focus:ring-2"
       />
+      <AddressBookControl address={address} onSelect={onChange} />
       {error && (
         <div className="mt-1 flex items-center gap-1 rounded border border-red-700/30 px-2 py-1 text-xs text-red-400">
           <AlertCircle className="h-3 w-3 flex-shrink-0" />
