@@ -162,9 +162,11 @@ type Interface interface {
 	// HaveAddress returns whether the wallet is the owner of the address.
 	HaveAddress(a btcutil.Address) (bool, error)
 
-	// ImportPublicKey imports a public key as a watch-only address.
+	// ImportPublicKey imports a public key as a watch-only address,
+	// optionally rescanning the chain from genesis for outputs received
+	// before the import.
 	ImportPublicKey(pubKey *btcec.PublicKey,
-		addrType waddrmgr.AddressType) error
+		addrType waddrmgr.AddressType, rescan bool) error
 
 	// ImportTaprootScript imports a taproot script into the wallet.
 	ImportTaprootScript(scope waddrmgr.KeyScope,

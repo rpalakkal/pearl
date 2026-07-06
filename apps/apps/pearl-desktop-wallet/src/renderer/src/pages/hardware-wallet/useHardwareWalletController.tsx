@@ -81,6 +81,7 @@ export function useHardwareWalletController(): HardwareWalletViewProps {
   const {
     addressInfo,
     balanceError,
+    balanceSource,
     clearHardwareBalance,
     invalidateBalanceRequests,
     isLoadingBalance,
@@ -196,7 +197,7 @@ export function useHardwareWalletController(): HardwareWalletViewProps {
   const pendingBalanceNotice = hasPendingOutgoingHardwareSpend
     ? PENDING_OUTGOING_HARDWARE_SEND_MESSAGE
     : hasPendingUtxos
-      ? 'UTXOs are excluded from hardware wallet sends until Blockbook reports them confirmed.'
+      ? 'UTXOs are excluded from hardware wallet sends until local Oyster reports them confirmed.'
       : null;
   const deviceDisplayAddress = useMemo(() => {
     if (!sendAddress.trim()) {
@@ -494,10 +495,13 @@ export function useHardwareWalletController(): HardwareWalletViewProps {
   };
 
   async function fetchHardwareWalletBalanceData(
-    address: string,
-    network: PearlNetwork
+    account: HardwareWalletAddress
   ): Promise<HardwareWalletBalanceData> {
-    return window.appBridge.hardwareWallet.getBalance(address, network);
+    return window.appBridge.hardwareWallet.getBalance({
+      address: account.address,
+      publicKey: account.publicKey,
+      network: account.network,
+    });
   }
 
   const refreshFeeRateForSend = async (account: HardwareWalletAddress): Promise<number | null> => {
@@ -678,6 +682,7 @@ export function useHardwareWalletController(): HardwareWalletViewProps {
         ? {
             balance: {
               balanceError,
+              balanceSource,
               hardwareAddress,
               hasPendingDeviceOperation,
               isLoadingBalance,

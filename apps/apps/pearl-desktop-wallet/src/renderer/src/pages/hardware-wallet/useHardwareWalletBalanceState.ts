@@ -1,7 +1,11 @@
 import {useRef, useState} from 'react';
 import {getErrorMessage} from '../../lib/utils.ts';
-import type {HardwareWalletAddress, PearlNetwork} from '../../lib/hardwareWallet.ts';
-import type {BlockbookAddressInfo, BlockbookUtxo} from '../../../../types/app-bridge.ts';
+import type {HardwareWalletAddress} from '../../lib/hardwareWallet.ts';
+import type {
+  BlockbookAddressInfo,
+  BlockbookUtxo,
+  HardwareBalanceSource,
+} from '../../../../types/app-bridge.ts';
 import {
   getErrorLogMessage,
   hardwareAccountLogContext,
@@ -11,25 +15,31 @@ import {
 import type {HardwareWalletBalanceData} from './balanceData.ts';
 
 type FetchHardwareWalletBalanceData = (
-  address: string,
-  network: PearlNetwork
+  account: HardwareWalletAddress
 ) => Promise<HardwareWalletBalanceData>;
 
 export function useHardwareWalletBalanceState(fetchBalanceData: FetchHardwareWalletBalanceData) {
   const balanceRequestIdRef = useRef(0);
   const [addressInfo, setAddressInfo] = useState<BlockbookAddressInfo | null>(null);
   const [balanceError, setBalanceError] = useState<string | null>(null);
+  const [balanceSource, setBalanceSource] = useState<HardwareBalanceSource | null>(null);
   const [isLoadingBalance, setIsLoadingBalance] = useState(false);
   const [utxos, setUtxos] = useState<BlockbookUtxo[]>([]);
 
-  const setHardwareBalanceData = ({info, utxos: addressUtxos}: HardwareWalletBalanceData) => {
+  const setHardwareBalanceData = ({
+    info,
+    utxos: addressUtxos,
+    source,
+  }: HardwareWalletBalanceData) => {
     setAddressInfo(info);
     setUtxos(addressUtxos);
+    setBalanceSource(source);
   };
 
   const clearHardwareBalance = () => {
     setAddressInfo(null);
     setUtxos([]);
+    setBalanceSource(null);
   };
 
   const invalidateBalanceRequests = () => {
@@ -45,7 +55,7 @@ export function useHardwareWalletBalanceState(fetchBalanceData: FetchHardwareWal
     logHardwareWalletEvent('balance:start', hardwareAccountLogContext(account));
 
     try {
-      const balance = await fetchBalanceData(account.address, account.network);
+      const balance = await fetchBalanceData(account);
 
       if (requestId !== balanceRequestIdRef.current) {
         return;
@@ -81,6 +91,7 @@ export function useHardwareWalletBalanceState(fetchBalanceData: FetchHardwareWal
   return {
     addressInfo,
     balanceError,
+    balanceSource,
     clearHardwareBalance,
     invalidateBalanceRequests,
     isLoadingBalance,

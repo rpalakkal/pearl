@@ -2,7 +2,10 @@ import {ipcMain} from 'electron';
 import {ManagerService} from '../services/manager-service';
 import {BlockbookClient} from '../clients/blockbook-client';
 import {HardwareWalletService} from '../services/hardware-wallet-service/hardware-wallet-service.ts';
-import type {HardwareWalletBroadcastRequest} from '../../types/app-bridge.ts';
+import type {
+  HardwareWalletAccountRequest,
+  HardwareWalletBroadcastRequest,
+} from '../../types/app-bridge.ts';
 
 function registerWalletIpc(ms: ManagerService) {
   ipcMain.handle('wallet-unlock', (_event, passphrase: string, timeout: number = 60) =>
@@ -31,20 +34,25 @@ function registerWalletIpc(ms: ManagerService) {
     ms.ensureWalletService().validateAddress(address)
   );
   ipcMain.handle('wallet-get-new-address', _event => ms.ensureWalletService().getNewAddress());
+  ipcMain.handle('wallet-get-addresses-by-account', (_event, account: string = 'default') =>
+    ms.ensureWalletService().getAddressesByAccount(account)
+  );
   ipcMain.handle(
     'wallet-estimate-fee',
     (_event, numBlocks: number, network?: 'mainnet' | 'testnet') =>
       BlockbookClient.estimateFee(numBlocks, network)
   );
+  // Hardware wallet handlers must not require an initialized software wallet:
+  // in hardware-only mode they fall back to the external indexer.
   ipcMain.handle(
     'hardware-wallet-get-balance',
-    (_event, address: string, network?: 'mainnet' | 'testnet') =>
-      HardwareWalletService.getBalance(address, network)
+    (_event, request: HardwareWalletAccountRequest) =>
+      HardwareWalletService.getBalance(request, ms.getWalletServiceIfRunning())
   );
   ipcMain.handle(
     'hardware-wallet-broadcast-transaction',
     (_event, request: HardwareWalletBroadcastRequest) =>
-      HardwareWalletService.broadcastTransaction(request)
+      HardwareWalletService.broadcastTransaction(request, ms.getWalletServiceIfRunning())
   );
 }
 

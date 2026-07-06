@@ -6,8 +6,10 @@ import (
 	"fmt"
 
 	"github.com/pearl-research-labs/pearl/node/btcec"
+	"github.com/pearl-research-labs/pearl/node/btcec/schnorr"
 	"github.com/pearl-research-labs/pearl/node/btcutil"
 	"github.com/pearl-research-labs/pearl/node/btcutil/hdkeychain"
+	"github.com/pearl-research-labs/pearl/node/txscript"
 	"github.com/pearl-research-labs/pearl/wallet/waddrmgr"
 	"github.com/pearl-research-labs/pearl/wallet/walletdb"
 )
@@ -276,9 +278,14 @@ func (w *Wallet) ImportAccountDryRun(name string,
 	return accountProps, externalAddrs, internalAddrs, nil
 }
 
-// ImportPublicKey imports a single derived public key into the address manager.
+// ImportPublicKey imports a single derived public key into the address manager
+// as a watch-only address. Importing an already-known public key is not an
+// error: the import is idempotent so watch-only hardware wallet refreshes can
+// call it repeatedly. When rescan is true and the key was not previously
+// known, a background blockchain rescan from genesis is submitted so outputs
+// received before the import are discovered.
 func (w *Wallet) ImportPublicKey(pubKey *btcec.PublicKey,
-	addrType waddrmgr.AddressType) error {
+	addrType waddrmgr.AddressType, rescan bool) error {
 
 	// Only BIP-0086 (Taproot) keys are supported for now,
 	keyScope := waddrmgr.KeyScopeBIP0086
@@ -288,20 +295,58 @@ func (w *Wallet) ImportPublicKey(pubKey *btcec.PublicKey,
 		return err
 	}
 
-	// TODO: Perform rescan if requested.
 	var addr waddrmgr.ManagedAddress
 	err = walletdb.Update(w.db, func(tx walletdb.ReadWriteTx) error {
 		ns := tx.ReadWriteBucket(waddrmgrNamespaceKey)
 		addr, err = scopedKeyManager.ImportPublicKey(ns, pubKey, nil)
 		return err
 	})
-	if err != nil {
+	isDuplicate := waddrmgr.IsError(err, waddrmgr.ErrDuplicateAddress)
+	if err != nil && !isDuplicate {
 		return err
 	}
 
-	log.Infof("Imported address %v", addr.Address())
+	var address btcutil.Address
+	if isDuplicate {
+		// The key is already tracked. Derive its taproot address the
+		// same way the manager computes the stored address ID so the
+		// notification subscription below still covers it. A rescan is
+		// intentionally not repeated for duplicates; the first import
+		// already scheduled one when requested.
+		taprootKey := txscript.ComputeTaprootKeyNoScript(pubKey)
+		address, err = btcutil.NewAddressTaproot(
+			schnorr.SerializePubKey(taprootKey), w.chainParams,
+		)
+		if err != nil {
+			return err
+		}
 
-	err = w.chainClient.NotifyReceived([]btcutil.Address{addr.Address()})
+		log.Debugf("Public key for address %v already imported", address)
+	} else {
+		address = addr.Address()
+		log.Infof("Imported address %v", address)
+	}
+
+	if rescan && !isDuplicate {
+		// Rescan from genesis so outputs received before the import are
+		// discovered. Correctness-first: the rescan runs in the
+		// background, subscribes the address itself, and its completion
+		// is logged by the rescan manager. The buffered error channel
+		// does not need to be read.
+		bs := waddrmgr.BlockStamp{
+			Hash:      *w.chainParams.GenesisHash,
+			Height:    0,
+			Timestamp: w.chainParams.GenesisBlock.BlockHeader().Timestamp,
+		}
+		_ = w.SubmitRescan(&RescanJob{
+			Addrs:      []btcutil.Address{address},
+			OutPoints:  nil,
+			BlockStamp: bs,
+		})
+		return nil
+	}
+
+	err = w.chainClient.NotifyReceived([]btcutil.Address{address})
 	if err != nil {
 		return fmt.Errorf("unable to subscribe for address "+
 			"notifications: %w", err)

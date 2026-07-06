@@ -14,6 +14,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/pearl-research-labs/pearl/node/btcec"
 	"github.com/pearl-research-labs/pearl/node/btcec/schnorr"
 	"github.com/pearl-research-labs/pearl/node/btcjson"
 	"github.com/pearl-research-labs/pearl/node/btcutil"
@@ -88,6 +89,7 @@ var rpcHandlers = map[string]struct {
 	"gettransaction":         {handler: getTransaction},
 	"help":                   {handler: helpNoChainRPC, handlerWithChain: helpWithChainRPC},
 	"importprivkey":          {handler: importPrivKey},
+	"importpubkey":           {handler: importPubKey, noHelp: true},
 	"keypoolrefill":          {handler: keypoolRefill},
 	"listaccounts":           {handler: listAccounts},
 	"listlockunspent":        {handler: listLockUnspent},
@@ -100,6 +102,7 @@ var rpcHandlers = map[string]struct {
 	"sendfrom":               {handlerWithChain: sendFrom},
 	"sendmany":               {handler: sendMany},
 	"sendtoaddress":          {handler: sendToAddress},
+	"sendrawtransaction":     {handler: sendRawTransaction, noHelp: true},
 	"settxfee":               {handler: setTxFee},
 	"signmessage":            {handler: signMessage},
 	"signrawtransaction":     {handlerWithChain: signRawTransaction},
@@ -558,6 +561,47 @@ func importPrivKey(icmd interface{}, w *wallet.Wallet) (interface{}, error) {
 		return nil, nil
 	case waddrmgr.IsError(err, waddrmgr.ErrLocked):
 		return nil, &ErrWalletUnlockNeeded
+	}
+
+	return nil, err
+}
+
+func parsePublicKey(pubKeyHex string) (*btcec.PublicKey, error) {
+	pubKeyBytes, err := hex.DecodeString(pubKeyHex)
+	if err != nil {
+		return nil, err
+	}
+
+	if len(pubKeyBytes) == schnorr.PubKeyBytesLen {
+		return schnorr.ParsePubKey(pubKeyBytes)
+	}
+
+	return btcec.ParsePubKey(pubKeyBytes)
+}
+
+// importPubKey handles an importpubkey request by parsing a public key and
+// importing it as a watch-only Taproot address.
+func importPubKey(icmd interface{}, w *wallet.Wallet) (interface{}, error) {
+	cmd := icmd.(*btcjson.ImportPubKeyCmd)
+
+	pubKey, err := parsePublicKey(cmd.PubKey)
+	if err != nil {
+		return nil, &btcjson.RPCError{
+			Code:    btcjson.ErrRPCInvalidAddressOrKey,
+			Message: "public key decode failed: " + err.Error(),
+		}
+	}
+
+	rescan := cmd.Rescan != nil && *cmd.Rescan
+
+	err = w.ImportPublicKey(pubKey, waddrmgr.TaprootPubKey, rescan)
+	switch {
+	case waddrmgr.IsError(err, waddrmgr.ErrDuplicateAddress):
+		// Do not return duplicate key errors to the client. Import is
+		// intentionally idempotent for watch-only hardware wallet refreshes.
+		// (The wallet already treats duplicates as success; this case is
+		// kept as a safety net.)
+		return nil, nil
 	}
 
 	return nil, err
@@ -1495,6 +1539,33 @@ func sendToAddress(icmd interface{}, w *wallet.Wallet) (interface{}, error) {
 
 	// sendtoaddress always spends from the default account, this matches bitcoind
 	return sendPairs(w, pairs, waddrmgr.KeyScopeBIP0086, waddrmgr.DefaultAccountNum, 1, feeRate)
+}
+
+// sendRawTransaction handles a sendrawtransaction request by publishing an
+// already-signed transaction to the local wallet's chain backend.
+func sendRawTransaction(icmd interface{}, w *wallet.Wallet) (interface{}, error) {
+	cmd := icmd.(*btcjson.SendRawTransactionCmd)
+	serializedTx, err := hex.DecodeString(cmd.HexTx)
+	if err != nil {
+		return nil, &btcjson.RPCError{
+			Code:    btcjson.ErrRPCDecodeHexString,
+			Message: err.Error(),
+		}
+	}
+
+	var tx wire.MsgTx
+	if err := tx.Deserialize(bytes.NewReader(serializedTx)); err != nil {
+		return nil, &btcjson.RPCError{
+			Code:    btcjson.ErrRPCDeserialization,
+			Message: err.Error(),
+		}
+	}
+
+	if err := w.PublishTransaction(&tx, ""); err != nil {
+		return nil, err
+	}
+
+	return tx.TxHash().String(), nil
 }
 
 // setTxFee sets the transaction fee per kilobyte added to transactions.

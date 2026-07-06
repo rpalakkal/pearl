@@ -46,6 +46,7 @@ export interface HardwareWalletConnectionModel {
 
 export interface HardwareWalletBalanceModel {
   balanceError: string | null;
+  balanceSource: 'oyster' | 'indexer' | null;
   hardwareAddress: HardwareWalletAddress;
   hasPendingDeviceOperation: boolean;
   isLoadingBalance: boolean;

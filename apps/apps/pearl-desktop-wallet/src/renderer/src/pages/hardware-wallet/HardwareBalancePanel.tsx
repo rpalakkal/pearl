@@ -14,7 +14,11 @@ export function HardwareBalancePanel({
       <div className="mb-3 flex items-center justify-between gap-3">
         <div>
           <div className="text-sm font-medium text-gray-700">Hardware Balance</div>
-          <div className="text-xs text-gray-500">Read from Blockbook</div>
+          <div className="text-xs text-gray-500">
+            {model.balanceSource === 'indexer'
+              ? 'Read from network indexer (no local wallet running)'
+              : 'Read from local Oyster'}
+          </div>
         </div>
         <button
           type="button"

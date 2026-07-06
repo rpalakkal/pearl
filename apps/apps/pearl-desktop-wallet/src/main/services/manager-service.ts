@@ -129,6 +129,17 @@ class ManagerService implements ManagerApi {
     return ws;
   }
 
+  // Hardware wallet flows must keep working when no software wallet has been
+  // loaded (hardware-only mode), so they take the local wallet only when its
+  // process is actually running and fall back to the external indexer
+  // otherwise.
+  getWalletServiceIfRunning(): WalletService | null {
+    if (!this.walletService || !this.walletProcess?.getStatus().isRunning) {
+      return null;
+    }
+    return this.walletService;
+  }
+
   getWalletsStats() {
     return {
       name: this.currentWallet?.name,

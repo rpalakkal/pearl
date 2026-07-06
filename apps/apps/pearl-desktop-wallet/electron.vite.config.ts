@@ -4,7 +4,9 @@ import react from '@vitejs/plugin-react';
 
 export default defineConfig({
   main: {
-    plugins: [externalizeDepsPlugin()],
+    // @pearl/wallet-core ships TypeScript sources, so it must be bundled into
+    // the main process instead of left as a runtime import.
+    plugins: [externalizeDepsPlugin({exclude: ['@pearl/wallet-core']})],
     build: {
       rollupOptions: {
         input: resolve(__dirname, 'src/main/index.ts'),

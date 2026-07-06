@@ -117,15 +117,22 @@ class WalletProcess {
     const walletPassphrase = passphrase ?? this.walletPassphrase;
 
     try {
+      // Reset only the wallet identity (wallet.db). The rest of the network
+      // directory holds chain-level SPV state (neutrino.db, block_headers.bin,
+      // reg_filter_headers.bin, peers.json) that is not tied to any wallet and
+      // must survive create/import so rescans and backfills can start from
+      // local headers instead of re-syncing from scratch.
       const networkConfig = getCurrentNetworkConfig();
       const networkDir = path.join(this.config.dataDir, networkConfig.dataSubdir);
-      if (fs.existsSync(networkDir)) {
-        fs.rmSync(networkDir, {recursive: true, force: true});
-      }
-
-      const walletDbPath = path.join(this.config.dataDir, 'wallet.db');
+      const walletDbPath = path.join(networkDir, 'wallet.db');
       if (fs.existsSync(walletDbPath)) {
         fs.unlinkSync(walletDbPath);
+      }
+
+      // Older builds wrote wallet.db at the data dir root; clean that up too.
+      const legacyWalletDbPath = path.join(this.config.dataDir, 'wallet.db');
+      if (fs.existsSync(legacyWalletDbPath)) {
+        fs.unlinkSync(legacyWalletDbPath);
       }
 
       const isImport = !!seed;
@@ -420,12 +427,17 @@ class WalletProcess {
       });
 
       lsofProcess.on('close', code => {
-        if (code === 0 && output.includes('pearlwall')) {
+        // The wallet binary shows up in lsof as "oyster-…" (truncated command
+        // name); older builds were named "pearlwall".
+        const isWalletProcessLine = (line: string) =>
+          line.includes('oyster') || line.includes('pearlwall');
+
+        if (code === 0 && output.split('\n').some(isWalletProcessLine)) {
           const lines = output.split('\n');
           const pids: string[] = [];
 
           for (const line of lines) {
-            if (line.includes('pearlwall')) {
+            if (isWalletProcessLine(line)) {
               const parts = line.split(/\s+/);
               if (parts.length > 1) {
                 pids.push(parts[1]);

@@ -35,7 +35,7 @@ export interface SendHardwareTransactionWorkflowParams {
   ) => Promise<HardwareWalletBroadcastResult>;
   estimateFeeRate: (network: PearlNetwork) => Promise<number | null>;
   feeRatePrlPerKb: number;
-  fetchBalanceData: (address: string, network: PearlNetwork) => Promise<HardwareWalletBalanceData>;
+  fetchBalanceData: (account: HardwareWalletAddress) => Promise<HardwareWalletBalanceData>;
   isActiveHardwareAccount: (account: HardwareWalletAddress) => boolean;
   recipientInput: string;
   setBalanceData: (balance: HardwareWalletBalanceData) => void;
@@ -85,7 +85,7 @@ export async function sendHardwareTransactionWorkflow({
       utxos,
     });
     logHardwareWalletEvent('send:preview', hardwareSendPreviewLogContext(currentPreview));
-    const latestBalance = await fetchBalanceData(account.address, account.network);
+    const latestBalance = await fetchBalanceData(account);
 
     if (!isActiveHardwareAccount(account)) {
       return;
@@ -165,6 +165,7 @@ export async function sendHardwareTransactionWorkflow({
       network: account.network,
       rawTransactionHex: signedTransaction.rawTransactionHex,
       sourceAddress: account.address,
+      sourcePublicKey: account.publicKey,
     });
 
     if (!isActiveHardwareAccount(account)) {
@@ -194,11 +195,11 @@ export async function sendHardwareTransactionWorkflow({
       'send:balance-refresh-error',
       {
         ...hardwareAccountLogContext(account),
-        error: 'Blockbook balance refresh unavailable after broadcast',
+        error: 'Local Oyster balance refresh unavailable after broadcast',
       },
       'warn'
     );
-    setBalanceError('Transaction broadcast. Refresh balance to update Blockbook status.');
+    setBalanceError('Transaction broadcast. Refresh balance to update local Oyster status.');
   } catch (error) {
     if (!isActiveHardwareAccount(account)) {
       return;

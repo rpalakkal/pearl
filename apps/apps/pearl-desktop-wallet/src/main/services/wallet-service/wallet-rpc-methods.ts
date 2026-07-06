@@ -1,6 +1,17 @@
 import { RpcClient } from '../rpc-client';
 import type { SyncProgress } from '../../../types/app-bridge';
 
+export interface ListUnspentResult {
+  txid: string;
+  vout: number;
+  address?: string;
+  account?: string;
+  scriptPubKey: string;
+  amount: number;
+  confirmations: number;
+  spendable: boolean;
+}
+
 class WalletRpcMethods {
   constructor(private readonly rpc: RpcClient) { }
 
@@ -38,6 +49,10 @@ class WalletRpcMethods {
     return this.rpc.call<void>('importprivkey', [privateKey, label, rescan]);
   }
 
+  importPublicKey(publicKey: string, rescan: boolean = false) {
+    return this.rpc.call<void>('importpubkey', [publicKey, rescan]);
+  }
+
   getNewAddress(account: string = 'default') {
     return this.rpc.call<string>('getnewaddress', [account]);
   }
@@ -59,6 +74,10 @@ class WalletRpcMethods {
     return this.rpc.call<any>('listtransactions', [undefined, count, from]);
   }
 
+  listUnspent(minconf: number = 0, maxconf: number = 9999999) {
+    return this.rpc.call<ListUnspentResult[]>('listunspent', [minconf, maxconf]);
+  }
+
   unlockWallet(passphrase: string, timeout: number = 3600) {
     return this.rpc.call<void>('walletpassphrase', [passphrase, timeout]);
   }
@@ -74,6 +93,10 @@ class WalletRpcMethods {
   sendFromDefaultAccount(toAddress: string, amount: number, feeRate: number, minconf: number = 0) {
     const outputs = { [toAddress]: amount };
     return this.rpc.call<string>('sendmany', ['default', outputs, feeRate, minconf]);
+  }
+
+  sendRawTransaction(rawTransactionHex: string) {
+    return this.rpc.call<string>('sendrawtransaction', [rawTransactionHex]);
   }
 
   async validateAddress(address: string) {
