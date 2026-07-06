@@ -352,6 +352,17 @@ type GetSyncProgressResult struct {
 	Synced             bool  `json:"synced"`
 }
 
+// RescanAddressResult models the data from the rescanaddress and
+// getrescanstatus commands.
+type RescanAddressResult struct {
+	Address       string `json:"address"`
+	Status        string `json:"status"`
+	StartHeight   int32  `json:"start_height"`
+	CurrentHeight int32  `json:"current_height"`
+	TargetHeight  int32  `json:"target_height"`
+	Error         string `json:"error,omitempty"`
+}
+
 // BalanceDetailsResult models the details data from the `getbalances` command.
 type BalanceDetailsResult struct {
 	Trusted          float64  `json:"trusted"`

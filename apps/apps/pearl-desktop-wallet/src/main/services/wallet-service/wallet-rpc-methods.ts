@@ -1,5 +1,25 @@
 import { RpcClient } from '../rpc-client';
-import type { SyncProgress } from '../../../types/app-bridge';
+import type { AddressBackfillStatus, SyncProgress } from '../../../types/app-bridge';
+
+interface RawBackfillStatus {
+  address: string;
+  status: AddressBackfillStatus['status'];
+  start_height: number;
+  current_height: number;
+  target_height: number;
+  error?: string;
+}
+
+function normalizeBackfillStatus(raw: RawBackfillStatus): AddressBackfillStatus {
+  return {
+    address: raw.address,
+    status: raw.status,
+    startHeight: raw.start_height,
+    currentHeight: raw.current_height,
+    targetHeight: raw.target_height,
+    error: raw.error,
+  };
+}
 
 export interface ListUnspentResult {
   txid: string;
@@ -97,6 +117,22 @@ class WalletRpcMethods {
 
   sendRawTransaction(rawTransactionHex: string) {
     return this.rpc.call<string>('sendrawtransaction', [rawTransactionHex]);
+  }
+
+  rescanAddress(address: string, startHeight: number = 0, publicKey?: string) {
+    const params: (string | number)[] = [address, startHeight];
+    if (publicKey) {
+      params.push(publicKey);
+    }
+    return this.rpc
+      .call<RawBackfillStatus>('rescanaddress', params)
+      .then(normalizeBackfillStatus);
+  }
+
+  getRescanStatus(address: string) {
+    return this.rpc
+      .call<RawBackfillStatus>('getrescanstatus', [address])
+      .then(normalizeBackfillStatus);
   }
 
   async validateAddress(address: string) {

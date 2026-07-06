@@ -1,14 +1,27 @@
-import {RefreshCw} from 'lucide-react';
+import {History, Loader2, RefreshCw} from 'lucide-react';
 import {formatSatsAsPearl} from '../../lib/hardwareWallet.ts';
 import type {HardwareWalletBalanceModel, HardwareWalletViewActions} from './viewModel.ts';
+
+function backfillPercent(model: HardwareWalletBalanceModel): number {
+  const backfill = model.backfill;
+  if (!backfill || backfill.targetHeight <= backfill.startHeight) {
+    return 0;
+  }
+  const scanned = backfill.currentHeight - backfill.startHeight;
+  const total = backfill.targetHeight - backfill.startHeight;
+  return Math.max(0, Math.min(100, Math.round((scanned / total) * 100)));
+}
 
 export function HardwareBalancePanel({
   actions,
   model,
 }: {
-  actions: Pick<HardwareWalletViewActions, 'loadHardwareWalletBalance'>;
+  actions: Pick<HardwareWalletViewActions, 'loadHardwareWalletBalance' | 'backfillHardwareAddress'>;
   model: HardwareWalletBalanceModel;
 }) {
+  const backfill = model.backfill;
+  const isBackfillInFlight =
+    backfill !== null && (backfill.status === 'queued' || backfill.status === 'running');
   return (
     <div className="rounded-lg border border-gray-200 bg-gray-50 p-4">
       <div className="mb-3 flex items-center justify-between gap-3">
@@ -56,6 +69,65 @@ export function HardwareBalancePanel({
       {model.pendingBalanceNotice && !model.balanceError && (
         <div className="mt-3 rounded-md border border-amber-200 bg-amber-50 p-2 text-xs text-amber-900">
           {model.pendingBalanceNotice}
+        </div>
+      )}
+
+      {model.canBackfill && (
+        <div className="mt-3 border-t border-gray-200 pt-3">
+          <div className="flex items-center justify-between gap-3">
+            <div className="text-xs text-gray-500">
+              Missing history? Backfill rescans the chain from genesis for this address.
+            </div>
+            <button
+              type="button"
+              onClick={actions.backfillHardwareAddress}
+              disabled={isBackfillInFlight || model.hasPendingDeviceOperation}
+              className="inline-flex flex-shrink-0 items-center gap-1 rounded-lg border border-gray-300 bg-white px-2 py-1 text-xs text-gray-700 shadow-sm transition-all hover:border-gray-400 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              {isBackfillInFlight ? (
+                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+              ) : (
+                <History className="h-3.5 w-3.5" />
+              )}
+              Backfill history
+            </button>
+          </div>
+
+          {isBackfillInFlight && backfill && (
+            <div className="mt-2 rounded-md border border-amber-200 bg-amber-50 p-2 text-xs text-amber-900">
+              <div className="mb-1 flex items-center justify-between">
+                <span>Backfill in progress — balance may be incomplete until it finishes.</span>
+                <span className="font-mono">
+                  {backfill.currentHeight.toLocaleString()} /{' '}
+                  {backfill.targetHeight.toLocaleString()}
+                </span>
+              </div>
+              <div className="h-1.5 w-full overflow-hidden rounded-full bg-amber-100">
+                <div
+                  className="h-full rounded-full bg-amber-500 transition-all"
+                  style={{width: `${backfillPercent(model)}%`}}
+                />
+              </div>
+            </div>
+          )}
+
+          {backfill?.status === 'complete' && (
+            <div className="mt-2 rounded-md border border-green-200 bg-green-50 p-2 text-xs text-green-800">
+              Backfill complete through block {backfill.targetHeight.toLocaleString()}.
+            </div>
+          )}
+
+          {backfill?.status === 'failed' && (
+            <div className="mt-2 rounded-md border border-red-200 bg-red-50 p-2 text-xs text-red-700">
+              Backfill failed{backfill.error ? `: ${backfill.error}` : '.'}
+            </div>
+          )}
+
+          {model.backfillError && (
+            <div className="mt-2 rounded-md border border-red-200 bg-red-50 p-2 text-xs text-red-700">
+              {model.backfillError}
+            </div>
+          )}
         </div>
       )}
     </div>

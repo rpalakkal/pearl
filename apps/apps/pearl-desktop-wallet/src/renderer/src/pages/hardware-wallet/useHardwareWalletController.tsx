@@ -45,6 +45,8 @@ import type {
   HardwareWalletViewProps,
   SendPreviewState,
 } from './viewModel.ts';
+import type {AddressBackfillStatus} from '../../../../types/app-bridge.ts';
+import {getErrorMessage} from '../../lib/utils.ts';
 import {
   PENDING_OUTGOING_HARDWARE_SEND_MESSAGE,
   sendHardwareTransactionWorkflow,
@@ -106,6 +108,8 @@ export function useHardwareWalletController(): HardwareWalletViewProps {
   } = useHardwareSendFormState();
   const [verifyError, setVerifyError] = useState<string | null>(null);
   const [verifiedDeviceAddress, setVerifiedDeviceAddress] = useState<string | null>(null);
+  const [backfillStatus, setBackfillStatus] = useState<AddressBackfillStatus | null>(null);
+  const [backfillError, setBackfillError] = useState<string | null>(null);
   const [isRememberedAccount, setIsRememberedAccount] = useState(false);
   const [feeRate, setFeeRate] = useState(0.0001);
   const {
@@ -253,6 +257,8 @@ export function useHardwareWalletController(): HardwareWalletViewProps {
     resetSendState(true);
     setVerifyError(null);
     setVerifiedDeviceAddress(null);
+    setBackfillStatus(null);
+    setBackfillError(null);
   };
 
   const resetActiveHardwareAccount = () => {
@@ -470,6 +476,78 @@ export function useHardwareWalletController(): HardwareWalletViewProps {
     selectAddressIndex(nextAddressIndex);
   };
 
+  const isBackfillInFlight =
+    backfillStatus !== null &&
+    (backfillStatus.status === 'queued' || backfillStatus.status === 'running');
+
+  // Poll a queued/running backfill and refresh the balance when it completes
+  // so newly discovered UTXOs show up.
+  useEffect(() => {
+    if (!isBackfillInFlight || !backfillStatus) {
+      return;
+    }
+
+    const address = backfillStatus.address;
+    const interval = setInterval(async () => {
+      try {
+        const status = await window.appBridge.wallet.getRescanStatus(address);
+        setBackfillStatus(status);
+
+        if (status.status === 'complete' && hardwareAddress?.address === address) {
+          void loadHardwareWalletBalance(hardwareAddress);
+        }
+      } catch (error) {
+        // The wallet stopped or restarted; job state lives in the wallet
+        // process, so the backfill can simply be started again.
+        setBackfillStatus(null);
+        setBackfillError(
+          getErrorMessage(error, 'Lost track of the backfill; it can be restarted.')
+        );
+      }
+    }, 2000);
+
+    return () => clearInterval(interval);
+  }, [isBackfillInFlight, backfillStatus?.address, hardwareAddress]);
+
+  const backfillHardwareAddress = async () => {
+    if (!hardwareAddress || hasPendingDeviceOperation || isBackfillInFlight) {
+      return;
+    }
+
+    const account = hardwareAddress;
+    setBackfillError(null);
+    logHardwareWalletEvent('backfill:start', hardwareAccountLogContext(account));
+
+    try {
+      const status = await window.appBridge.wallet.rescanAddress(
+        account.address,
+        0,
+        account.publicKey
+      );
+
+      if (!isActiveHardwareAccount(account)) {
+        return;
+      }
+
+      setBackfillStatus(status);
+    } catch (error) {
+      if (!isActiveHardwareAccount(account)) {
+        return;
+      }
+
+      console.error('Failed to start hardware address backfill:', error);
+      logHardwareWalletEvent(
+        'backfill:error',
+        {
+          ...hardwareAccountLogContext(account),
+          error: getErrorLogMessage(error),
+        },
+        'error'
+      );
+      setBackfillError(getErrorMessage(error, 'Failed to start backfill.'));
+    }
+  };
+
   const loadFeeRate = async (network: PearlNetwork) => {
     try {
       const nextFeeRate = Number(await window.appBridge.wallet.estimateFee(1, network));
@@ -644,6 +722,9 @@ export function useHardwareWalletController(): HardwareWalletViewProps {
 
   const actions: HardwareWalletViewActions = {
     addHardwareAddress,
+    backfillHardwareAddress: () => {
+      void backfillHardwareAddress();
+    },
     connectDevice: () => {
       void connectDevice();
     },
@@ -681,8 +762,11 @@ export function useHardwareWalletController(): HardwareWalletViewProps {
       connectedWallet: hardwareAddress
         ? {
             balance: {
+              backfill: backfillStatus,
+              backfillError,
               balanceError,
               balanceSource,
+              canBackfill: balanceSource === 'oyster',
               hardwareAddress,
               hasPendingDeviceOperation,
               isLoadingBalance,

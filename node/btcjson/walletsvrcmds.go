@@ -1106,6 +1106,38 @@ func NewGetSyncProgressCmd() *GetSyncProgressCmd {
 	return &GetSyncProgressCmd{}
 }
 
+// RescanAddressCmd defines the rescanaddress JSON-RPC command.
+type RescanAddressCmd struct {
+	Address     string
+	StartHeight *int32 `jsonrpcdefault:"0"`
+	PubKey      *string
+}
+
+// NewRescanAddressCmd returns a new instance which can be used to issue a
+// rescanaddress JSON-RPC command.
+func NewRescanAddressCmd(address string, startHeight *int32,
+	pubKey *string) *RescanAddressCmd {
+
+	return &RescanAddressCmd{
+		Address:     address,
+		StartHeight: startHeight,
+		PubKey:      pubKey,
+	}
+}
+
+// GetRescanStatusCmd defines the getrescanstatus JSON-RPC command.
+type GetRescanStatusCmd struct {
+	Address string
+}
+
+// NewGetRescanStatusCmd returns a new instance which can be used to issue a
+// getrescanstatus JSON-RPC command.
+func NewGetRescanStatusCmd(address string) *GetRescanStatusCmd {
+	return &GetRescanStatusCmd{
+		Address: address,
+	}
+}
+
 func init() {
 	// The commands in this file are only usable with a wallet server.
 	flags := UFWalletOnly
@@ -1161,4 +1193,6 @@ func init() {
 	MustRegisterCmd("walletcreatefundedpsbt", (*WalletCreateFundedPsbtCmd)(nil), flags)
 	MustRegisterCmd("walletprocesspsbt", (*WalletProcessPsbtCmd)(nil), flags)
 	MustRegisterCmd("getsyncprogress", (*GetSyncProgressCmd)(nil), flags)
+	MustRegisterCmd("rescanaddress", (*RescanAddressCmd)(nil), flags)
+	MustRegisterCmd("getrescanstatus", (*GetRescanStatusCmd)(nil), flags)
 }

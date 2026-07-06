@@ -128,6 +128,8 @@ var rpcHandlers = map[string]struct {
 	// Extensions to the reference client JSON-RPC API
 	"chainsynced":      {handler: chainSynced},
 	"getsyncprogress":  {handler: getSyncProgress},
+	"rescanaddress":    {handler: rescanAddress, noHelp: true},
+	"getrescanstatus":  {handler: getRescanStatus, noHelp: true},
 	"createnewaccount": {handler: createNewAccount},
 	"getbestblock":     {handler: getBestBlock},
 	// This was an extension but the reference implementation added it as
@@ -605,6 +607,108 @@ func importPubKey(icmd interface{}, w *wallet.Wallet) (interface{}, error) {
 	}
 
 	return nil, err
+}
+
+// backfillStatusResult converts a wallet backfill job status to its JSON-RPC
+// result form.
+func backfillStatusResult(status wallet.BackfillJobStatus) *btcjson.RescanAddressResult {
+	return &btcjson.RescanAddressResult{
+		Address:       status.Address,
+		Status:        status.Status,
+		StartHeight:   status.StartHeight,
+		CurrentHeight: status.CurrentHeight,
+		TargetHeight:  status.TargetHeight,
+		Error:         status.Error,
+	}
+}
+
+// rescanAddress handles a rescanaddress request by starting a background
+// backfill rescan for a single address and returning its initial status. When
+// a public key is supplied it is verified against the address and imported as
+// a watch-only key if the wallet does not already track it.
+func rescanAddress(icmd interface{}, w *wallet.Wallet) (interface{}, error) {
+	cmd := icmd.(*btcjson.RescanAddressCmd)
+
+	addr, err := decodeAddress(cmd.Address, w.ChainParams())
+	if err != nil {
+		return nil, err
+	}
+
+	if cmd.PubKey != nil && *cmd.PubKey != "" {
+		pubKey, err := parsePublicKey(*cmd.PubKey)
+		if err != nil {
+			return nil, &btcjson.RPCError{
+				Code:    btcjson.ErrRPCInvalidAddressOrKey,
+				Message: "public key decode failed: " + err.Error(),
+			}
+		}
+
+		taprootKey := txscript.ComputeTaprootKeyNoScript(pubKey)
+		derived, err := btcutil.NewAddressTaproot(
+			schnorr.SerializePubKey(taprootKey), w.ChainParams(),
+		)
+		if err != nil {
+			return nil, err
+		}
+		if derived.EncodeAddress() != addr.EncodeAddress() {
+			return nil, &btcjson.RPCError{
+				Code:    btcjson.ErrRPCInvalidAddressOrKey,
+				Message: "address does not match the supplied public key",
+			}
+		}
+
+		// Idempotent watch-only import without an implicit rescan; the
+		// explicit backfill below covers history.
+		err = w.ImportPublicKey(pubKey, waddrmgr.TaprootPubKey, false)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	// A rescan only records outputs for addresses the wallet tracks, so a
+	// backfill of an unknown address would silently find nothing.
+	have, err := w.HaveAddress(addr)
+	if err != nil {
+		return nil, err
+	}
+	if !have {
+		return nil, &btcjson.RPCError{
+			Code: btcjson.ErrRPCInvalidAddressOrKey,
+			Message: "address is not tracked by this wallet; supply its " +
+				"public key to import it as watch-only first",
+		}
+	}
+
+	startHeight := int32(0)
+	if cmd.StartHeight != nil {
+		startHeight = *cmd.StartHeight
+	}
+
+	status, err := w.StartAddressBackfill(addr, startHeight)
+	if err != nil {
+		return nil, &btcjson.RPCError{
+			Code:    btcjson.ErrRPCWallet,
+			Message: err.Error(),
+		}
+	}
+
+	return backfillStatusResult(status), nil
+}
+
+// getRescanStatus handles a getrescanstatus request by returning the status of
+// the most recent backfill started for an address with rescanaddress.
+func getRescanStatus(icmd interface{}, w *wallet.Wallet) (interface{}, error) {
+	cmd := icmd.(*btcjson.GetRescanStatusCmd)
+
+	status, ok := w.BackfillStatus(cmd.Address)
+	if !ok {
+		return nil, &btcjson.RPCError{
+			Code:    btcjson.ErrRPCInvalidParameter,
+			Message: "no backfill has been started for this address",
+		}
+	}
+
+	return backfillStatusResult(status), nil
 }
 
 // keypoolRefill handles the keypoolrefill command. Since we handle the keypool

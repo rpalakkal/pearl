@@ -33,6 +33,18 @@ interface WindowApi {
   openExternal: (url: string) => void;
 }
 
+// Progress of an explicit address backfill rescan (rescanaddress RPC). Job
+// state lives in the wallet process; discovered UTXOs persist in the wallet
+// database.
+interface AddressBackfillStatus {
+  address: string;
+  status: 'queued' | 'running' | 'complete' | 'failed';
+  startHeight: number;
+  currentHeight: number;
+  targetHeight: number;
+  error?: string;
+}
+
 interface WalletApi {
   getNewAddress: () => Promise<string>;
 
@@ -57,6 +69,14 @@ interface WalletApi {
   getAddressesByAccount: (account?: string) => Promise<string[]>;
 
   estimateFee: (numBlocks: number, network?: AppNetwork) => Promise<number>;
+
+  rescanAddress: (
+    address: string,
+    startHeight?: number,
+    publicKey?: string
+  ) => Promise<AddressBackfillStatus>;
+
+  getRescanStatus: (address: string) => Promise<AddressBackfillStatus>;
 }
 
 interface Contact {
@@ -228,6 +248,7 @@ export type {
   AppBridge,
   WindowApi,
   WalletApi,
+  AddressBackfillStatus,
   HardwareWalletApi,
   HardwareBalanceSource,
   HardwareWalletBalance,

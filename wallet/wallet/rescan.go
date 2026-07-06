@@ -18,6 +18,10 @@ import (
 type RescanProgressMsg struct {
 	Addresses    []btcutil.Address
 	Notification chain.RescanProgress
+
+	// backfillAddrs identifies explicit address backfill jobs that are part
+	// of this rescan batch, so their tracked progress can be updated.
+	backfillAddrs []string
 }
 
 // RescanFinishedMsg reports the addresses that were rescanned when a
@@ -25,6 +29,10 @@ type RescanProgressMsg struct {
 type RescanFinishedMsg struct {
 	Addresses    []btcutil.Address
 	Notification *chain.RescanFinished
+
+	// backfillAddrs identifies explicit address backfill jobs that are part
+	// of this rescan batch, so they can be marked complete.
+	backfillAddrs []string
 }
 
 // RescanJob is a job to be processed by the RescanManager.  The job includes
@@ -38,16 +46,21 @@ type RescanJob struct {
 	OutPoints   map[wire.OutPoint]btcutil.Address
 	BlockStamp  waddrmgr.BlockStamp
 	err         chan error
+
+	// backfillAddrs marks this job as an explicit address backfill for the
+	// given encoded addresses, tracked by the wallet's backfill registry.
+	backfillAddrs []string
 }
 
 // rescanBatch is a collection of one or more RescanJobs that were merged
 // together before a rescan is performed.
 type rescanBatch struct {
-	initialSync bool
-	addrs       []btcutil.Address
-	outpoints   map[wire.OutPoint]btcutil.Address
-	bs          waddrmgr.BlockStamp
-	errChans    []chan error
+	initialSync   bool
+	addrs         []btcutil.Address
+	outpoints     map[wire.OutPoint]btcutil.Address
+	bs            waddrmgr.BlockStamp
+	errChans      []chan error
+	backfillAddrs []string
 }
 
 // SubmitRescan submits a RescanJob to the RescanManager.  A channel is
@@ -67,11 +80,12 @@ func (w *Wallet) SubmitRescan(job *RescanJob) <-chan error {
 // batch creates the rescanBatch for a single rescan job.
 func (job *RescanJob) batch() *rescanBatch {
 	return &rescanBatch{
-		initialSync: job.InitialSync,
-		addrs:       job.Addrs,
-		outpoints:   job.OutPoints,
-		bs:          job.BlockStamp,
-		errChans:    []chan error{job.err},
+		initialSync:   job.InitialSync,
+		addrs:         job.Addrs,
+		outpoints:     job.OutPoints,
+		bs:            job.BlockStamp,
+		errChans:      []chan error{job.err},
+		backfillAddrs: job.backfillAddrs,
 	}
 }
 
@@ -83,6 +97,7 @@ func (b *rescanBatch) merge(job *RescanJob) {
 		b.initialSync = true
 	}
 	b.addrs = append(b.addrs, job.Addrs...)
+	b.backfillAddrs = append(b.backfillAddrs, job.backfillAddrs...)
 
 	for op, addr := range job.OutPoints {
 		b.outpoints[op] = addr
@@ -146,8 +161,9 @@ func (w *Wallet) rescanBatchHandler() {
 				}
 				select {
 				case w.rescanProgress <- &RescanProgressMsg{
-					Addresses:    curBatch.addrs,
-					Notification: *n,
+					Addresses:     curBatch.addrs,
+					Notification:  *n,
+					backfillAddrs: curBatch.backfillAddrs,
 				}:
 				case <-quit:
 					for _, errChan := range curBatch.errChans {
@@ -165,8 +181,9 @@ func (w *Wallet) rescanBatchHandler() {
 				}
 				select {
 				case w.rescanFinished <- &RescanFinishedMsg{
-					Addresses:    curBatch.addrs,
-					Notification: n,
+					Addresses:     curBatch.addrs,
+					Notification:  n,
+					backfillAddrs: curBatch.backfillAddrs,
 				}:
 				case <-quit:
 					for _, errChan := range curBatch.errChans {
@@ -213,6 +230,7 @@ out:
 			n := msg.Notification
 			log.Infof("Rescanned through block %v (height %d)",
 				n.Hash, n.Height)
+			w.updateBackfillProgress(msg.backfillAddrs, n.Height)
 
 		case msg := <-w.rescanFinished:
 			n := msg.Notification
@@ -221,6 +239,7 @@ out:
 			log.Infof("Finished rescan for %d %s (synced to block "+
 				"%s, height %d)", len(addrs), noun, n.Hash,
 				n.Height)
+			w.completeBackfillJobs(msg.backfillAddrs, n.Height)
 
 			go w.resendUnminedTxs()
 

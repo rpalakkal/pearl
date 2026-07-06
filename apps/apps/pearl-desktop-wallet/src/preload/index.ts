@@ -40,6 +40,9 @@ const walletIpc: Ipc<WalletApi> = {
   getAddressesByAccount: account => ipcRenderer.invoke('wallet-get-addresses-by-account', account),
   estimateFee: (numBlocks, network) =>
     ipcRenderer.invoke('wallet-estimate-fee', numBlocks, network),
+  rescanAddress: (address, startHeight, publicKey) =>
+    ipcRenderer.invoke('wallet-rescan-address', address, startHeight, publicKey),
+  getRescanStatus: address => ipcRenderer.invoke('wallet-rescan-status', address),
 };
 
 const hardwareWalletIpc: Ipc<HardwareWalletApi> = {

@@ -38,6 +38,14 @@ function registerWalletIpc(ms: ManagerService) {
     ms.ensureWalletService().getAddressesByAccount(account)
   );
   ipcMain.handle(
+    'wallet-rescan-address',
+    (_event, address: string, startHeight: number = 0, publicKey?: string) =>
+      ms.ensureWalletService().rescanAddress(address, startHeight, publicKey)
+  );
+  ipcMain.handle('wallet-rescan-status', (_event, address: string) =>
+    ms.ensureWalletService().getRescanStatus(address)
+  );
+  ipcMain.handle(
     'wallet-estimate-fee',
     (_event, numBlocks: number, network?: 'mainnet' | 'testnet') =>
       BlockbookClient.estimateFee(numBlocks, network)

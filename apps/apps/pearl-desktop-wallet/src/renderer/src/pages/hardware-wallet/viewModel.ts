@@ -6,6 +6,7 @@ import type {
   PearlNetwork,
 } from '../../lib/hardwareWallet.ts';
 import type {HardwareAddressSelectorOption} from '../../lib/hardwareWalletStorage.ts';
+import type {AddressBackfillStatus} from '../../../../types/app-bridge.ts';
 
 export type SendPreviewState =
   | {preview: HardwarePearlSendPreview; error: null}
@@ -45,8 +46,11 @@ export interface HardwareWalletConnectionModel {
 }
 
 export interface HardwareWalletBalanceModel {
+  backfill: AddressBackfillStatus | null;
+  backfillError: string | null;
   balanceError: string | null;
   balanceSource: 'oyster' | 'indexer' | null;
+  canBackfill: boolean;
   hardwareAddress: HardwareWalletAddress;
   hasPendingDeviceOperation: boolean;
   isLoadingBalance: boolean;
@@ -107,6 +111,7 @@ export interface HardwareWalletViewModel {
 
 export interface HardwareWalletViewActions {
   addHardwareAddress: () => void;
+  backfillHardwareAddress: () => void;
   connectDevice: () => void;
   copyToClipboard: (text: string) => void;
   forgetHardwareAccount: () => void;
