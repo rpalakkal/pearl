@@ -11,6 +11,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"sort"
 	"sync"
 	"time"
 
@@ -128,8 +129,9 @@ var rpcHandlers = map[string]struct {
 	// Extensions to the reference client JSON-RPC API
 	"chainsynced":      {handler: chainSynced},
 	"getsyncprogress":  {handler: getSyncProgress},
-	"rescanaddress":    {handler: rescanAddress, noHelp: true},
-	"getrescanstatus":  {handler: getRescanStatus, noHelp: true},
+	"rescanaddress":     {handler: rescanAddress, noHelp: true},
+	"getrescanstatus":   {handler: getRescanStatus, noHelp: true},
+	"getaddresshistory": {handler: getAddressHistory, noHelp: true},
 	"createnewaccount": {handler: createNewAccount},
 	"getbestblock":     {handler: getBestBlock},
 	// This was an extension but the reference implementation added it as
@@ -693,6 +695,61 @@ func rescanAddress(icmd interface{}, w *wallet.Wallet) (interface{}, error) {
 	}
 
 	return backfillStatusResult(status), nil
+}
+
+// getAddressHistory handles a getaddresshistory request by returning every
+// wallet-known transaction involving an address, classified from that
+// address's perspective (unlike listtransactions, whose send/receive
+// categories are wallet-relative).
+func getAddressHistory(icmd interface{}, w *wallet.Wallet) (interface{}, error) {
+	cmd := icmd.(*btcjson.GetAddressHistoryCmd)
+
+	addr, err := decodeAddress(cmd.Address, w.ChainParams())
+	if err != nil {
+		return nil, err
+	}
+
+	entries, err := w.AddressHistory(addr)
+	if err != nil {
+		return nil, err
+	}
+
+	syncHeight := w.Manager.SyncedTo().Height
+	results := make([]btcjson.AddressHistoryResult, 0, len(entries))
+	for _, entry := range entries {
+		category := "receive"
+		if entry.Sent {
+			category = "send"
+		}
+
+		var confirmations int32
+		blockHash := ""
+		if entry.Height >= 0 {
+			confirmations = syncHeight - entry.Height + 1
+			if confirmations < 0 {
+				confirmations = 0
+			}
+			blockHash = entry.BlockHash.String()
+		}
+
+		results = append(results, btcjson.AddressHistoryResult{
+			TxID:          entry.TxHash.String(),
+			Category:      category,
+			Amount:        entry.Amount.ToPRL(),
+			Fee:           entry.Fee.ToPRL(),
+			Counterparty:  entry.Counterparty,
+			Confirmations: confirmations,
+			Time:          entry.Timestamp.Unix(),
+			BlockHash:     blockHash,
+		})
+	}
+
+	// Newest first, matching the app's activity ordering.
+	sort.Slice(results, func(i, j int) bool {
+		return results[i].Time > results[j].Time
+	})
+
+	return results, nil
 }
 
 // getRescanStatus handles a getrescanstatus request by returning the status of

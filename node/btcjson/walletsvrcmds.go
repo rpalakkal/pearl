@@ -1125,6 +1125,19 @@ func NewRescanAddressCmd(address string, startHeight *int32,
 	}
 }
 
+// GetAddressHistoryCmd defines the getaddresshistory JSON-RPC command.
+type GetAddressHistoryCmd struct {
+	Address string
+}
+
+// NewGetAddressHistoryCmd returns a new instance which can be used to issue a
+// getaddresshistory JSON-RPC command.
+func NewGetAddressHistoryCmd(address string) *GetAddressHistoryCmd {
+	return &GetAddressHistoryCmd{
+		Address: address,
+	}
+}
+
 // GetRescanStatusCmd defines the getrescanstatus JSON-RPC command.
 type GetRescanStatusCmd struct {
 	Address string
@@ -1195,4 +1208,5 @@ func init() {
 	MustRegisterCmd("getsyncprogress", (*GetSyncProgressCmd)(nil), flags)
 	MustRegisterCmd("rescanaddress", (*RescanAddressCmd)(nil), flags)
 	MustRegisterCmd("getrescanstatus", (*GetRescanStatusCmd)(nil), flags)
+	MustRegisterCmd("getaddresshistory", (*GetAddressHistoryCmd)(nil), flags)
 }

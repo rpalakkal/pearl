@@ -383,6 +383,14 @@ func (w *Wallet) scanBatchOnce(chainClient chain.Interface,
 			watchedOutPoints[outPoint] = outPointAddr
 		}
 
+		// BatchIndex is relative to the request; a value past the end
+		// would panic the slice below and take the whole process down.
+		if int(filterResp.BatchIndex) >= len(batch) {
+			return fmt.Errorf("chain backend returned batch index %d "+
+				"beyond batch of %d blocks", filterResp.BatchIndex,
+				len(batch))
+		}
+
 		batch = batch[filterResp.BatchIndex+1:]
 	}
 

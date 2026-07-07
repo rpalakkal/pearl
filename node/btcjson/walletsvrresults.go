@@ -363,6 +363,19 @@ type RescanAddressResult struct {
 	Error         string `json:"error,omitempty"`
 }
 
+// AddressHistoryResult models one entry from the getaddresshistory command:
+// a transaction classified from a single address's perspective.
+type AddressHistoryResult struct {
+	TxID          string  `json:"txid"`
+	Category      string  `json:"category"` // "send" or "receive"
+	Amount        float64 `json:"amount"`
+	Fee           float64 `json:"fee"`
+	Counterparty  string  `json:"counterparty,omitempty"`
+	Confirmations int32   `json:"confirmations"`
+	Time          int64   `json:"time"`
+	BlockHash     string  `json:"blockhash,omitempty"`
+}
+
 // BalanceDetailsResult models the details data from the `getbalances` command.
 type BalanceDetailsResult struct {
 	Trusted          float64  `json:"trusted"`

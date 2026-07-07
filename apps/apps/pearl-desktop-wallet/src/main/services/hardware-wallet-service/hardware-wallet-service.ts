@@ -153,8 +153,9 @@ export const HardwareWalletService = {
     return getHardwareWalletBalance(request, walletService);
   },
 
-  // Transaction history for a hardware address, from the local wallet's view
-  // (watch-only entries appear after import + backfill).
+  // Transaction history for a hardware address, classified from that
+  // address's perspective by the wallet's getaddresshistory RPC (watch-only
+  // entries appear after import + backfill).
   async getTransactions(
     request: HardwareWalletTransactionsRequest,
     walletService: WalletService
@@ -164,16 +165,29 @@ export const HardwareWalletService = {
     const pageSize = Math.max(1, Math.min(100, request.pageSize ?? 25));
 
     await walletService.importPublicKey(account.publicKey, true);
-    const [all, walletSyncing] = await Promise.all([
-      walletService.listAllTransactions(),
+    const [history, walletSyncing] = await Promise.all([
+      walletService.getAddressHistory(account.address),
       isWalletSyncing(walletService),
     ]);
-    const matching = all.filter((tx: {address?: string}) => tx.address === account.address);
+
+    const transactions = history.map(entry => ({
+      txid: entry.txid,
+      type: entry.category === 'send' ? ('sent' as const) : ('received' as const),
+      amount: Math.abs(entry.amount),
+      fee: Math.abs(entry.fee ?? 0),
+      confirmations: entry.confirmations,
+      time: entry.time * 1000,
+      address: entry.counterparty || account.address,
+      account: '',
+      blockhash: entry.blockhash ?? '',
+      trusted: false,
+      generated: false,
+    }));
 
     const start = (page - 1) * pageSize;
     return {
-      transactions: matching.slice(start, start + pageSize),
-      hasMore: start + pageSize < matching.length,
+      transactions: transactions.slice(start, start + pageSize),
+      hasMore: start + pageSize < transactions.length,
       source: 'oyster',
       walletSyncing,
     };

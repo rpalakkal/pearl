@@ -385,3 +385,74 @@ func blockMetaAt(height int32) wtxmgr.BlockMeta {
 		Time:  time.Unix(1234, 0),
 	}
 }
+
+func TestAddressHistoryClassifiesFromAddressPerspective(t *testing.T) {
+	w, cleanup := testWallet(t)
+	defer cleanup()
+
+	addr := testAddress(t, w)
+	pkScript, err := txscript.PayToAddrScript(addr)
+	require.NoError(t, err)
+
+	// Foreign output script (another taproot-like witness program).
+	foreign := make([]byte, 34)
+	foreign[0] = txscript.OP_1
+	foreign[1] = 32
+	foreign[2] = 0x99
+
+	// tx1 pays the address 100k.
+	fundingTx := wire.NewMsgTx(wire.TxVersion)
+	fundingTx.AddTxIn(&wire.TxIn{PreviousOutPoint: wire.OutPoint{Index: 3}})
+	fundingTx.AddTxOut(&wire.TxOut{Value: 100_000, PkScript: pkScript})
+	fundingHash := fundingTx.TxHash()
+
+	// tx2 spends tx1:0 and pays 60k to a foreign script (fee 40k).
+	spendTx := wire.NewMsgTx(wire.TxVersion)
+	spendTx.AddTxIn(&wire.TxIn{
+		PreviousOutPoint: wire.OutPoint{Hash: fundingHash, Index: 0},
+	})
+	spendTx.AddTxOut(&wire.TxOut{Value: 60_000, PkScript: foreign})
+
+	chainClient := &scriptedChainClient{current: true, bestHeight: 99}
+	chainClient.filterScript = []*chain.FilterBlocksResponse{
+		{
+			BatchIndex:   50,
+			BlockMeta:    blockMetaAt(50),
+			RelevantTxns: []*wire.MsgTx{fundingTx},
+			FoundOutPoints: map[wire.OutPoint]btcutil.Address{
+				{Hash: fundingHash, Index: 0}: addr,
+			},
+		},
+		{
+			// BatchIndex is relative to the (trimmed) request: after the
+			// match at index 50, the remaining batch starts at height 51,
+			// so height 60 sits at index 9.
+			BatchIndex:   9,
+			BlockMeta:    blockMetaAt(60),
+			RelevantTxns: []*wire.MsgTx{spendTx},
+		},
+	}
+	w.chainClient = chainClient
+
+	_, err = w.StartAddressBackfill(addr, 0)
+	require.NoError(t, err)
+	waitForJob(t, w, addr.EncodeAddress(), BackfillStatusComplete)
+
+	entries, err := w.AddressHistory(addr)
+	require.NoError(t, err)
+	require.Len(t, entries, 2)
+
+	byHash := map[chainhash.Hash]AddressHistoryEntry{}
+	for _, entry := range entries {
+		byHash[entry.TxHash] = entry
+	}
+
+	funding := byHash[fundingHash]
+	require.False(t, funding.Sent, "payment TO the address must be a receive")
+	require.Equal(t, btcutil.Amount(100_000), funding.Amount)
+
+	spend := byHash[spendTx.TxHash()]
+	require.True(t, spend.Sent, "spend FROM the address must be a send")
+	require.Equal(t, btcutil.Amount(60_000), spend.Amount)
+	require.Equal(t, btcutil.Amount(40_000), spend.Fee)
+}

@@ -119,6 +119,24 @@ class WalletRpcMethods {
     return this.rpc.call<string>('sendrawtransaction', [rawTransactionHex]);
   }
 
+  // Transactions involving one address, classified from that address's
+  // perspective (listtransactions categories are wallet-relative and read
+  // backwards for watch-only imports).
+  getAddressHistory(address: string) {
+    return this.rpc.call<
+      Array<{
+        txid: string;
+        category: 'send' | 'receive';
+        amount: number;
+        fee: number;
+        counterparty?: string;
+        confirmations: number;
+        time: number;
+        blockhash?: string;
+      }>
+    >('getaddresshistory', [address]);
+  }
+
   rescanAddress(address: string, startHeight: number = 0, publicKey?: string) {
     const params: (string | number)[] = [address, startHeight];
     if (publicKey) {
