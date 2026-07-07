@@ -16,6 +16,7 @@ interface UsePaginationResult {
   loading: boolean;
   hasMore: boolean;
   loadMore: () => Promise<void>;
+  refresh: () => void;
 }
 
 export function usePagination(options: UsePaginationOptions = {}): UsePaginationResult {
@@ -68,7 +69,7 @@ export function usePagination(options: UsePaginationOptions = {}): UsePagination
     }
   }, [pageSize]);
 
-  useEffect(() => {
+  const reset = useCallback(() => {
     generationRef.current += 1;
     offsetRef.current = 0;
     loadingRef.current = false;
@@ -76,10 +77,23 @@ export function usePagination(options: UsePaginationOptions = {}): UsePagination
     setActivities([]);
     setHasMore(true);
     setLoading(false);
+  }, []);
+
+  useEffect(() => {
+    reset();
     if (enabled) {
       void loadMore();
     }
-  }, [enabled, resetKey, loadMore]);
+  }, [enabled, resetKey, loadMore, reset]);
 
-  return { activities, loading, hasMore, loadMore };
+  return {
+    activities,
+    loading,
+    hasMore,
+    loadMore,
+    refresh: () => {
+      reset();
+      void loadMore();
+    },
+  };
 }

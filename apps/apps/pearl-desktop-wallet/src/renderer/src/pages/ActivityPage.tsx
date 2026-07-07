@@ -1,43 +1,28 @@
-import {ArrowLeft, ArrowUpRight, ArrowDownLeft, ExternalLink} from 'lucide-react';
+import {ArrowLeft, RefreshCw, Search} from 'lucide-react';
 import {Transaction} from '../../../types/transaction';
 import {usePagination} from '../hooks/usePagination';
 import {useHardwareActivity} from '../hooks/hardware/useHardwareActivity';
 import {useAccountsStore, useActiveAccount} from '../store/accountsStore';
 import {Button} from '@/components/ui/button';
-import {CopyButton} from '@/components/ui/copy-button';
-import {explorerTxUrl} from '../lib/explorer';
-import {useEffect, useRef} from 'react';
+import {ActivityRow, type ActivityAddressRole} from '../components/activity/ActivityRow';
+import {
+  groupActivities,
+  matchesActivityFilter,
+  type ActivityFilter,
+} from '../components/activity/activityGroups';
+import {AddressBookDialog} from '../components/contact-book/AddressBookDialog';
+import {useAddressBook} from '../components/contact-book/useAddressBook';
+import {useEffect, useMemo, useRef, useState} from 'react';
 
 interface ActivityPageProps {
   onBack: () => void;
 }
 
-const formatTimeAgo = (timestamp: number): string => {
-  const now = Date.now();
-  const diff = now - timestamp;
-
-  const minutes = Math.floor(diff / (1000 * 60));
-  const hours = Math.floor(diff / (1000 * 60 * 60));
-  const days = Math.floor(diff / (1000 * 60 * 60 * 24));
-
-  if (minutes < 60) {
-    return `${minutes}m ago`;
-  } else if (hours < 24) {
-    return `${hours}h ago`;
-  } else {
-    return `${days}d ago`;
-  }
-};
-
-const formatFullDate = (timestamp: number): string => {
-  const date = new Date(timestamp);
-  return date.toLocaleString();
-};
-
-const truncateTxId = (txid: string): string => {
-  if (txid.length <= 16) return txid;
-  return `${txid.slice(0, 8)}...${txid.slice(-8)}`;
-};
+const FILTERS: Array<{value: ActivityFilter; label: string}> = [
+  {value: 'all', label: 'All'},
+  {value: 'sent', label: 'Sent'},
+  {value: 'received', label: 'Received'},
+];
 
 export default function ActivityPage({onBack}: ActivityPageProps) {
   const active = useActiveAccount();
@@ -46,13 +31,26 @@ export default function ActivityPage({onBack}: ActivityPageProps) {
   const software = usePagination({pageSize: 25, enabled: !isHardware, resetKey: active?.id ?? null});
   const hardware = useHardwareActivity(isHardware ? active : null);
   const {activities, loading, hasMore, loadMore} = isHardware ? hardware : software;
+  const {resolveAddress} = useAddressBook();
+
+  const [filter, setFilter] = useState<ActivityFilter>('all');
+  const [query, setQuery] = useState('');
+  const [addContactAddress, setAddContactAddress] = useState<string | null>(null);
+
+  const isFiltered = filter !== 'all' || query.trim() !== '';
+  const filtered = useMemo(
+    () => activities.filter((tx: Transaction) => matchesActivityFilter(tx, filter, query)),
+    [activities, filter, query]
+  );
+  const groups = useMemo(() => groupActivities(filtered), [filtered]);
 
   // Infinite scroll: auto-load the next page when the sentinel at the list's
-  // end scrolls into view. The Load More button stays as a manual fallback.
+  // end scrolls into view — only while unfiltered, so a search doesn't
+  // silently trawl the entire history. Load More stays as manual fallback.
   const sentinelRef = useRef<HTMLDivElement | null>(null);
   const loadMoreRef = useRef(loadMore);
   loadMoreRef.current = loadMore;
-  const canAutoLoad = hasMore && !loading;
+  const canAutoLoad = hasMore && !loading && !isFiltered;
 
   useEffect(() => {
     const sentinel = sentinelRef.current;
@@ -68,6 +66,17 @@ export default function ActivityPage({onBack}: ActivityPageProps) {
     return () => observer.disconnect();
   }, [canAutoLoad]);
 
+  // Software received rows carry our own receiving address, not the sender.
+  function addressRoleFor(tx: Transaction): ActivityAddressRole {
+    return isHardware || tx.type === 'sent' ? 'counterparty' : 'own';
+  }
+
+  const totalLabel = isHardware
+    ? hardware.total !== null
+      ? `Showing ${activities.length} of ${hardware.total} transactions`
+      : `${activities.length} transactions loaded${hasMore ? ' — more available' : ''}`
+    : `${activities.length} transactions loaded${hasMore ? ' — more available' : ''}`;
+
   return (
     <div className="flex h-screen w-full flex-col bg-transparent">
       {/* Header */}
@@ -75,7 +84,48 @@ export default function ActivityPage({onBack}: ActivityPageProps) {
         <button onClick={onBack} className="rounded-lg p-2 transition-colors hover:bg-gray-100">
           <ArrowLeft className="h-5 w-5 text-gray-700" />
         </button>
-        <h1 className="text-2xl font-semibold text-gray-900">Activity</h1>
+        <h1 className="flex-1 text-2xl font-semibold text-gray-900">Activity</h1>
+        <button
+          onClick={() => (isHardware ? hardware.refresh() : software.refresh())}
+          disabled={loading}
+          className="rounded-lg p-2 transition-colors hover:bg-gray-100 disabled:opacity-50"
+          title="Refresh"
+        >
+          <RefreshCw className={`h-5 w-5 text-gray-700 ${loading ? 'animate-spin' : ''}`} />
+        </button>
+      </div>
+
+      {/* Filter / search sub-header */}
+      <div className="flex flex-shrink-0 flex-wrap items-center gap-3 border-b border-gray-200 bg-white/60 px-6 py-3">
+        <div className="flex overflow-hidden rounded-lg border border-gray-300 bg-white shadow-sm">
+          {FILTERS.map(option => (
+            <button
+              key={option.value}
+              type="button"
+              onClick={() => setFilter(option.value)}
+              className={`px-3 py-1.5 text-sm transition-colors ${
+                filter === option.value
+                  ? 'bg-gray-900 text-white'
+                  : 'text-gray-700 hover:bg-gray-100'
+              }`}
+            >
+              {option.label}
+            </button>
+          ))}
+        </div>
+        <div className="relative min-w-[200px] flex-1">
+          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+          <input
+            type="text"
+            value={query}
+            onChange={event => setQuery(event.target.value)}
+            placeholder="Search txid or address"
+            className="focus:border-brand-green focus:ring-brand-green/20 w-full rounded-lg border border-gray-300 bg-white py-1.5 pl-9 pr-3 text-sm text-gray-900 shadow-sm focus:outline-none focus:ring-2"
+          />
+        </div>
+        {isFiltered && (
+          <span className="text-xs text-gray-400">Search covers loaded transactions only.</span>
+        )}
       </div>
 
       {/* Content - Scrollable */}
@@ -91,6 +141,16 @@ export default function ActivityPage({onBack}: ActivityPageProps) {
             {hardware.walletSyncing && ' The wallet is still syncing; history may be incomplete.'}
           </div>
         )}
+        {isHardware &&
+          hardware.backfill &&
+          (hardware.backfill.status === 'queued' || hardware.backfill.status === 'running') && (
+            <div className="mb-4 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
+              A history backfill is in progress (
+              {hardware.backfill.currentHeight.toLocaleString()} /{' '}
+              {hardware.backfill.targetHeight.toLocaleString()}) — older transactions may be
+              missing.
+            </div>
+          )}
         {loading && activities.length === 0 ? (
           <div className="py-12 text-center text-gray-500">
             <p>Loading activities...</p>
@@ -100,78 +160,36 @@ export default function ActivityPage({onBack}: ActivityPageProps) {
             <p>No activity found</p>
           </div>
         ) : (
-          /* Activity List - Scrollable */
           <div className="space-y-4">
-            {activities.map((activity: Transaction, index) => (
-              <div
-                key={`${activity.type}_${activity.txid}_${index}`}
-                className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm transition-all hover:shadow-md"
-              >
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-4">
-                    <div className="flex h-12 w-12 items-center justify-center rounded-full bg-gray-100">
-                      {activity.type === 'received' ? (
-                        <ArrowDownLeft className="text-brand-green h-6 w-6" />
-                      ) : (
-                        <ArrowUpRight className="h-6 w-6 text-red-500" />
-                      )}
-                    </div>
-                    <div>
-                      <div className="text-lg font-medium text-gray-900">
-                        {activity.selfTransfer
-                          ? 'Sent to self'
-                          : activity.type === 'received'
-                            ? 'Received'
-                            : 'Sent'}
-                      </div>
-                      <div className="text-sm text-gray-600">
-                        {formatTimeAgo(activity.time)} • {formatFullDate(activity.time)}
-                      </div>
-                      <div className="mt-1 flex items-center gap-2">
-                        <span className="text-xs text-gray-500">
-                          Tx ID: {truncateTxId(activity.txid)}
-                        </span>
-                        <CopyButton
-                          value={activity.txid}
-                          className="rounded p-1"
-                          iconClassName="h-3 w-3"
-                          title="Copy transaction ID"
-                        />
-                        <button
-                          onClick={() =>
-                            window.appBridge.window.openExternal(
-                              explorerTxUrl(activity.txid, network)
-                            )
-                          }
-                          className="rounded p-1 transition-colors hover:bg-gray-100"
-                          title="View on prlscan.com"
-                        >
-                          <ExternalLink className="h-3 w-3 text-gray-400" />
-                        </button>
-                      </div>
-                    </div>
+            {filtered.length === 0 ? (
+              <div className="py-8 text-center text-sm text-gray-500">
+                No matches in loaded transactions.
+              </div>
+            ) : (
+              groups.map(group => (
+                <div key={group.label}>
+                  <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-400">
+                    {group.label}
                   </div>
-                  <div className="text-right">
-                    <div
-                      className={`text-lg font-bold ${
-                        activity.type === 'received' ? 'text-green-700' : 'text-red-500'
-                      }`}
-                    >
-                      {activity.type === 'received' ? '+' : '-'}
-                      {activity.amount} PRL
-                    </div>
-                    <div className="text-sm text-gray-600">
-                      {activity.confirmations} confirmations
-                    </div>
-                    {activity.fee > 0 && (
-                      <div className="text-xs text-gray-500">
-                        Fee: {activity.fee.toFixed(8)} PRL
-                      </div>
-                    )}
+                  <div className="space-y-4">
+                    {group.items.map((tx, index) => (
+                      <ActivityRow
+                        key={`${tx.type}_${tx.txid}_${index}`}
+                        tx={tx}
+                        network={network}
+                        addressRole={addressRoleFor(tx)}
+                        resolved={
+                          addressRoleFor(tx) === 'counterparty'
+                            ? resolveAddress(tx.address)
+                            : null
+                        }
+                        onAddContact={setAddContactAddress}
+                      />
+                    ))}
                   </div>
                 </div>
-              </div>
-            ))}
+              ))
+            )}
 
             {/* Invisible sentinel: scrolling it into view auto-loads the next page. */}
             <div ref={sentinelRef} aria-hidden className="h-px" />
@@ -198,11 +216,18 @@ export default function ActivityPage({onBack}: ActivityPageProps) {
 
             {/* Total count indicator */}
             <div className="mt-6 border-t border-gray-200 py-4 text-center text-sm text-gray-500">
-              {activities.length} transactions loaded
+              {totalLabel}
             </div>
           </div>
         )}
       </div>
+
+      <AddressBookDialog
+        isOpen={addContactAddress !== null}
+        onClose={() => setAddContactAddress(null)}
+        initialMode="add"
+        initialAddress={addContactAddress ?? ''}
+      />
     </div>
   );
 }

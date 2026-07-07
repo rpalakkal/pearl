@@ -103,6 +103,9 @@ function assertRecord(value: unknown, label: string): Record<string, unknown> {
 export interface BlockbookAddressHistory {
   transactions: import('../../types/transaction').Transaction[];
   hasMore: boolean;
+  // Total transaction count for the address per the indexer; null when the
+  // response omits it.
+  total: number | null;
 }
 
 interface RawBlockbookVinVout {
@@ -232,5 +235,9 @@ export function normalizeBlockbookAddressTransactions(
     .map(raw => normalizeBlockbookHistoryTransaction(raw, ourAddressLower, address))
     .filter((tx): tx is NonNullable<typeof tx> => tx !== null);
 
-  return {transactions, hasMore: page < totalPages};
+  return {
+    transactions,
+    hasMore: page < totalPages,
+    total: typeof record.txs === 'number' ? record.txs : null,
+  };
 }

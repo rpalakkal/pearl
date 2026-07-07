@@ -1,7 +1,5 @@
-import {useState, type ReactNode} from 'react';
+import {type ReactNode} from 'react';
 import {
-  Copy,
-  CheckCircle2,
   ArrowUpRight,
   ArrowDownLeft,
   Key,
@@ -27,19 +25,6 @@ export default function WalletDashboard() {
     syncPhase,
     isBlockchainSynced,
   } = useWalletStore();
-  const [copiedAddress, setCopiedAddress] = useState<string | null>(null);
-  const [walletAddress] = useState<string>('');
-
-  const copyToClipboard = async (text: string) => {
-    try {
-      await navigator.clipboard.writeText(text);
-      setCopiedAddress(text);
-      setTimeout(() => setCopiedAddress(null), 2000);
-    } catch (err) {
-      console.error('Failed to copy to clipboard:', err);
-    }
-  };
-
   const formatTimeAgo = (timestamp: number): string => {
     const now = Date.now();
     const diff = now - timestamp;
@@ -69,25 +54,6 @@ export default function WalletDashboard() {
           <div className="text-center">
             <h1 className="text-2xl font-medium text-gray-900">{walletName}</h1>
           </div>
-
-          {/* Address Display - only show if wallet name is default */}
-          {walletAddress && walletName === 'Pearl Wallet' && (
-            <div className="flex items-center justify-center gap-3 text-gray-600">
-              <span className="font-mono text-base" title={`Full address: ${walletAddress}`}>
-                {walletAddress.slice(0, 6)}...{walletAddress.slice(-4)}
-              </span>
-              <button
-                onClick={() => copyToClipboard(walletAddress)}
-                className="p-1.5 transition-colors hover:text-gray-900"
-              >
-                {copiedAddress === walletAddress ? (
-                  <CheckCircle2 className="text-brand-green h-4 w-4" />
-                ) : (
-                  <Copy className="h-4 w-4" />
-                )}
-              </button>
-            </div>
-          )}
 
           {/* Balance Section */}
           <div className="space-y-2 text-center">
@@ -207,9 +173,11 @@ export default function WalletDashboard() {
                 </div>
               ) : (
                 activitiesPreview.map(activity => (
-                  <div
+                  <button
+                    type="button"
                     key={`${activity.type}_${activity.txid}_${activity.amount}`}
-                    className="flex items-center justify-between rounded-lg border border-gray-200 bg-white p-4 shadow-sm transition-shadow hover:shadow-md"
+                    onClick={() => navigate('/activity')}
+                    className="flex w-full cursor-pointer items-center justify-between rounded-lg border border-gray-200 bg-white p-4 text-left shadow-sm transition-shadow hover:shadow-md"
                   >
                     <div className="flex items-center gap-3">
                       <div className="flex h-8 w-8 items-center justify-center rounded-full bg-gray-100">
@@ -221,7 +189,11 @@ export default function WalletDashboard() {
                       </div>
                       <div>
                         <div className="text-sm font-medium text-gray-900">
-                          {activity.type === 'received' ? 'Received' : 'Sent'}
+                          {activity.selfTransfer
+                            ? 'Sent to self'
+                            : activity.type === 'received'
+                              ? 'Received'
+                              : 'Sent'}
                         </div>
                         <div className="text-xs text-gray-500">{formatTimeAgo(activity.time)}</div>
                       </div>
@@ -234,7 +206,7 @@ export default function WalletDashboard() {
                       {activity.type === 'received' ? '+' : '-'}
                       {activity.amount} PRL
                     </div>
-                  </div>
+                  </button>
                 ))
               )}
             </div>

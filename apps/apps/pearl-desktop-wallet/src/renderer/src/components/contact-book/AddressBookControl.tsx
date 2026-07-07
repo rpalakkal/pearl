@@ -3,7 +3,7 @@ import {BookUser, UserRound, UserRoundPlus, Wallet} from 'lucide-react';
 import {AddressBookDialog} from './AddressBookDialog';
 import {useAddressBook, type KnownAddress} from './useAddressBook';
 
-function KnownAddressBadge({entry}: {entry: KnownAddress}) {
+export function KnownAddressBadge({entry}: {entry: KnownAddress}) {
   const isContact = entry.source === 'contact';
   const Icon = isContact ? UserRound : Wallet;
   const text = isContact ? `Contact: ${entry.label}` : entry.label;

@@ -15,7 +15,7 @@
     "build:linux": "pnpm run build && electron-builder --linux",
     "dev": "electron-vite dev --watch",
     "typecheck": "tsc --noEmit",
-    "test:hardware": "pnpm run typecheck && node --experimental-strip-types --test src/renderer/src/lib/hardwareWallet.test.ts src/renderer/src/lib/hardwareWalletTransactions.test.ts src/renderer/src/lib/hardwareWalletEnvironment.test.ts src/main/clients/blockbook-client.test.ts src/renderer/src/lib/sendGate.test.ts src/renderer/src/pages/hardware-wallet/sendWorkflow.test.ts src/renderer/src/pages/hardware-wallet/useHardwareSendFormState.test.ts src/main/config/send-history-model.test.ts src/main/config/contact-validation.test.ts src/main/config/app-lock.test.ts src/renderer/src/lib/accounts.test.ts src/renderer/src/lib/softwareSendEstimate.test.ts",
+    "test:hardware": "pnpm run typecheck && node --experimental-strip-types --test src/renderer/src/lib/hardwareWallet.test.ts src/renderer/src/lib/hardwareWalletTransactions.test.ts src/renderer/src/lib/hardwareWalletEnvironment.test.ts src/main/clients/blockbook-client.test.ts src/renderer/src/lib/sendGate.test.ts src/renderer/src/pages/hardware-wallet/sendWorkflow.test.ts src/renderer/src/pages/hardware-wallet/useHardwareSendFormState.test.ts src/main/config/send-history-model.test.ts src/main/config/contact-validation.test.ts src/main/config/app-lock.test.ts src/renderer/src/lib/accounts.test.ts src/renderer/src/lib/softwareSendEstimate.test.ts src/renderer/src/components/activity/activityGroups.test.ts",
     "lint": "eslint . --ext .vue,.js,.jsx,.cjs,.mjs,.ts,.tsx,.cts,.mts --fix --ignore-path .gitignore",
     "preview": "electron-vite preview",
     "pack": "pnpm run build && electron-builder --dir",

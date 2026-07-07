@@ -208,6 +208,7 @@ export const HardwareWalletService = {
     return {
       transactions: transactions.slice(start, start + pageSize),
       hasMore: start + pageSize < transactions.length,
+      total: transactions.length,
       source: 'oyster',
       walletSyncing,
     };

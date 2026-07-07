@@ -80,9 +80,11 @@ export function HardwareDashboard({account}: {account: WalletAccount & {kind: 'h
           ) : (
             <div className="space-y-3">
               {activity.activities.slice(0, 3).map((tx, index) => (
-                <div
+                <button
+                  type="button"
                   key={`${tx.txid}_${index}`}
-                  className="flex items-center justify-between rounded-lg border border-gray-200 bg-white p-4 shadow-sm"
+                  onClick={() => navigate('/activity')}
+                  className="flex w-full cursor-pointer items-center justify-between rounded-lg border border-gray-200 bg-white p-4 text-left shadow-sm transition-shadow hover:shadow-md"
                 >
                   <div className="flex items-center gap-3">
                     <div className="flex h-10 w-10 items-center justify-center rounded-full bg-gray-100">
@@ -111,7 +113,7 @@ export function HardwareDashboard({account}: {account: WalletAccount & {kind: 'h
                     {tx.type === 'received' ? '+' : '-'}
                     {tx.amount} PRL
                   </div>
-                </div>
+                </button>
               ))}
             </div>
           )}

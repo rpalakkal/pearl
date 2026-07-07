@@ -172,6 +172,9 @@ interface HardwareWalletTransactionsRequest extends HardwareWalletAccountRequest
 interface HardwareWalletTransactionsResult {
   transactions: Transaction[];
   hasMore: boolean;
+  // Total transaction count for the address; null when the indexer response
+  // omits it.
+  total: number | null;
   // History is indexer-first (global view, no per-wallet store gaps) with
   // the local wallet as offline fallback.
   source: 'indexer' | 'oyster';
