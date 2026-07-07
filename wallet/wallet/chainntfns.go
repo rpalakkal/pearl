@@ -328,13 +328,14 @@ func (w *Wallet) addRelevantTx(dbtx walletdb.ReadWriteTx, rec *wtxmgr.TxRecord,
 		return err
 	}
 
-	// If the transaction has already been recorded, we can return early.
-	// Note: Returning here is safe as we're within the context of an atomic
-	// database transaction, so we don't need to worry about the MarkUsed
-	// calls below.
-	if exists {
-		return nil
-	}
+	// Even when the transaction has already been recorded, the outputs must
+	// be scanned again: an address imported AFTER the transaction was first
+	// recorded (watch-only import followed by a backfill) can add credits
+	// the original scan could not have known about. Returning early here
+	// permanently dropped such credits — the tx record existed with credits
+	// only for the addresses tracked at first sight, and the new address's
+	// balance stayed short. AddCredit is idempotent per (tx, output, block),
+	// so re-scanning existing records is safe and cheap.
 
 	// Check every output to determine whether it is controlled by a wallet
 	// key.  If so, mark the output as a credit.
@@ -398,15 +399,18 @@ func (w *Wallet) addRelevantTx(dbtx walletdb.ReadWriteTx, rec *wtxmgr.TxRecord,
 	}
 
 	// Send notification of mined or unmined transaction to any interested
-	// clients.
+	// clients. Only newly inserted transactions notify; re-scans of already
+	// recorded transactions (see above) stay silent.
 	//
 	// TODO: Avoid the extra db hits.
-	if block == nil {
-		w.NtfnServer.notifyUnminedTransaction(dbtx, txmgrNs, rec.Hash)
-	} else {
-		w.NtfnServer.notifyMinedTransaction(
-			dbtx, txmgrNs, rec.Hash, block,
-		)
+	if !exists {
+		if block == nil {
+			w.NtfnServer.notifyUnminedTransaction(dbtx, txmgrNs, rec.Hash)
+		} else {
+			w.NtfnServer.notifyMinedTransaction(
+				dbtx, txmgrNs, rec.Hash, block,
+			)
+		}
 	}
 
 	return nil
