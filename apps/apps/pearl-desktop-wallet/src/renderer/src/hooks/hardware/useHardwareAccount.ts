@@ -44,6 +44,8 @@ import type {
   SendPreviewState,
 } from '../../pages/hardware-wallet/viewModel.ts';
 import {evaluateSendGate, satsToPearlInput} from '../../lib/sendGate.ts';
+import {writeCachedBalance} from '../../lib/accountBalanceCache.ts';
+import {hardwareAccountId} from '../../lib/accounts.ts';
 import {useAddressBook} from '../../components/contact-book/useAddressBook.ts';
 import {useContactsStore} from '../../store/contactsStore.ts';
 import {useWalletStore} from '../../store/walletStore.ts';
@@ -263,6 +265,19 @@ export function useHardwareAccount(
       hasPendingOutgoingHardwareSpend ? 0n : maxSpendableHardwareSendSats(utxos, feeRate),
     [feeRate, hasPendingOutgoingHardwareSpend, utxos]
   );
+
+  // Last-known balance for the account switcher (live hardware reads are too
+  // heavy for a dropdown).
+  useEffect(() => {
+    if (account && addressInfo) {
+      writeCachedBalance(
+        account.network,
+        hardwareAccountId(account),
+        Number(satsToPearlInput(spendableBalanceSats))
+      );
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [account, addressInfo, spendableBalanceSats]);
   const pendingBalanceSats = useMemo(
     () => getHardwareBalanceSats(addressInfo?.unconfirmedBalance),
     [addressInfo?.unconfirmedBalance]

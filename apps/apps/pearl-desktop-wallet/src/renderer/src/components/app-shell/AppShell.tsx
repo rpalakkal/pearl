@@ -2,12 +2,14 @@ import {useEffect} from 'react';
 import {Outlet, useNavigate} from 'react-router-dom';
 import {AlertCircle, Lock, X} from 'lucide-react';
 import {AccountSwitcher} from './AccountSwitcher';
+import {SyncStatusChip} from './SyncStatusChip';
 import {NetworkSelector} from '../NetworkSelector';
 import {SettingsButton} from '../SettingsButton';
 import {MigratePassphraseDialog} from '../app-lock/MigratePassphraseDialog';
-import {useAccountsStore} from '../../store/accountsStore';
+import {useAccountsStore, useActiveAccount} from '../../store/accountsStore';
 import {useWalletStore} from '../../store/walletStore';
 import {useAppLockGuard} from '../../hooks/useAppLockGuard';
+import {accountDisplayName} from '../../lib/accounts';
 
 /**
  * Persistent chrome for everything behind the app lock: account switcher,
@@ -18,12 +20,24 @@ export default function AppShell() {
   const navigate = useNavigate();
   const {refreshAccounts, migrateWalletName, clearMigration, switchError, clearSwitchError} =
     useAccountsStore();
+  const network = useAccountsStore(state => state.network);
+  const active = useActiveAccount();
   const {syncPhase, clearWalletData} = useWalletStore();
+  const isTestnet = network === 'testnet';
 
   useEffect(() => {
     void refreshAccounts();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  useEffect(() => {
+    const name = active ? accountDisplayName(active) : null;
+    const net = isTestnet ? 'Testnet' : 'Mainnet';
+    document.title = name ? `${name} — ${net} — Pearl Wallet` : 'Pearl Wallet';
+    return () => {
+      document.title = 'Pearl Wallet';
+    };
+  }, [active, isTestnet]);
 
   async function handleLock() {
     clearWalletData();
@@ -40,8 +54,20 @@ export default function AppShell() {
 
   return (
     <div className="flex h-full w-full flex-col">
-      <header className="flex flex-shrink-0 items-center justify-between border-b border-gray-200 bg-white/80 px-4 py-2 shadow-sm backdrop-blur-sm sm:px-6">
-        <AccountSwitcher />
+      <header
+        className={`flex flex-shrink-0 items-center justify-between border-b px-4 py-2 shadow-sm backdrop-blur-sm sm:px-6 ${
+          isTestnet ? 'border-amber-200 bg-amber-50/80' : 'border-gray-200 bg-white/80'
+        }`}
+      >
+        <div className="flex items-center gap-3">
+          <AccountSwitcher />
+          {isTestnet && (
+            <span className="rounded-full border border-amber-300 bg-amber-100 px-2 py-0.5 text-xs font-semibold text-amber-800">
+              TESTNET
+            </span>
+          )}
+          <SyncStatusChip />
+        </div>
         <div className="flex items-center gap-3">
           <NetworkSelector />
           <SettingsButton />

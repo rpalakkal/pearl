@@ -3,6 +3,7 @@ import WelcomePage from './pages/WelcomePage';
 import ImportAccount from './pages/ImportAccount';
 import CreateWallet from './pages/create-wallet/CreateWallet';
 import ActivityPage from './pages/ActivityPage';
+import ContactsPage from './pages/ContactsPage';
 import UnifiedDashboard from './pages/unified/UnifiedDashboard';
 import UnifiedSend from './pages/unified/UnifiedSend';
 import UnifiedReceive from './pages/unified/UnifiedReceive';
@@ -45,6 +46,7 @@ function AppContent() {
             {/* Dissolved into the unified pages; keep old links working. */}
             <Route path="/hardware-wallet" element={<Navigate to="/wallet" replace />} />
             <Route path="/change-password" element={<ChangePassword />} />
+            <Route path="/contacts" element={<ContactsPage />} />
             <Route path="/activity" element={<ActivityPage onBack={() => navigate('/wallet')} />} />
           </Route>
 

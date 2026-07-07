@@ -1,6 +1,12 @@
 import { Transaction } from '../../../types/transaction';
 import type { SyncPhase, SyncProgress } from '../../../types/app-bridge';
 import { create } from 'zustand';
+import { diffNewReceivedTxs, notifyIncomingTransactions } from '../lib/incomingTxNotifier';
+
+// Txids already announced (or seeded) for the current wallet session. Reset
+// by clearWalletData — which runs on lock and on account switch — so the
+// next poll re-seeds instead of replaying history as fresh payments.
+let seenTxids: Set<string> | null = null;
 
 interface WalletState {
   walletName: string;
@@ -65,6 +71,16 @@ export const useWalletStore = create<WalletState>()((set, get) => ({
       ]);
       set({ activitiesPreview: transactions });
 
+      // Only notify once fully synced — an initial scan floods the preview
+      // with historic receives. The seen set always advances regardless.
+      if (get().isBlockchainSynced) {
+        notifyIncomingTransactions(diffNewReceivedTxs(seenTxids, transactions));
+      }
+      seenTxids = new Set([
+        ...(seenTxids ?? []),
+        ...transactions.map(transaction => transaction.txid),
+      ]);
+
       if (walletsStats.name) {
         set({ walletName: walletsStats.name });
       }
@@ -95,6 +111,7 @@ export const useWalletStore = create<WalletState>()((set, get) => ({
   },
 
   clearWalletData: () => {
+    seenTxids = null;
     set(useWalletStore.getInitialState());
   },
 

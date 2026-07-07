@@ -1,10 +1,24 @@
 import { useState, useEffect } from 'react';
-import { X, RotateCcw, Save } from 'lucide-react';
+import { X, RotateCcw, Save, AlertCircle } from 'lucide-react';
 import { Button } from '@pearl/ui/components/button';
+import { toast } from '@/components/ui/use-toast';
+import { ToastAction } from '@/components/ui/toast';
 
 interface PeerSettingsModalProps {
     isOpen: boolean;
     onClose: () => void;
+}
+
+function restartToast(description: string) {
+    toast({
+        title: 'Peer settings saved',
+        description,
+        action: (
+            <ToastAction altText="Restart now" onClick={() => window.appBridge.window.relaunch()}>
+                Restart now
+            </ToastAction>
+        ),
+    });
 }
 
 export function PeerSettingsModal({ isOpen, onClose }: PeerSettingsModalProps) {
@@ -15,9 +29,11 @@ export function PeerSettingsModal({ isOpen, onClose }: PeerSettingsModalProps) {
     const [isCustom, setIsCustom] = useState(false);
     const [isSaving, setIsSaving] = useState(false);
     const [network, setNetwork] = useState('');
+    const [formError, setFormError] = useState<string | null>(null);
 
     useEffect(() => {
         if (isOpen) {
+            setFormError(null);
             loadPeerSettings();
         }
     }, [isOpen]);
@@ -33,38 +49,53 @@ export function PeerSettingsModal({ isOpen, onClose }: PeerSettingsModalProps) {
             setNetwork(settings.network);
         } catch (error) {
             console.error('Failed to load peer settings:', error);
+            setFormError('Failed to load current peer settings.');
         }
     };
 
     const handleSave = async () => {
+        setFormError(null);
+
+        const address = peerAddress.trim();
+        const port = parseInt(peerPort, 10);
+        if (!address) {
+            setFormError('Enter a peer address.');
+            return;
+        }
+        if (isNaN(port) || port < 1 || port > 65535) {
+            setFormError('Enter a valid port between 1 and 65535.');
+            return;
+        }
+
         setIsSaving(true);
         try {
-            const port = parseInt(peerPort, 10);
-            if (isNaN(port) || port < 1 || port > 65535) {
-                alert('Invalid port number');
+            const validation = await window.appBridge.manager.validatePeerAddress(address, port);
+            if (!validation.valid) {
+                setFormError(validation.error ?? `Cannot connect to ${address}:${port}.`);
                 return;
             }
 
-            await window.appBridge.manager.setCustomPeerAddress(peerAddress, port);
-            alert('Peer settings saved! Please restart the wallet for changes to take effect.');
+            await window.appBridge.manager.setCustomPeerAddress(address, port);
+            restartToast(`Now using ${address}:${port}. Restart to apply.`);
             onClose();
         } catch (error) {
             console.error('Failed to save peer settings:', error);
-            alert('Failed to save settings');
+            setFormError('Failed to save settings.');
         } finally {
             setIsSaving(false);
         }
     };
 
     const handleReset = async () => {
+        setFormError(null);
         setIsSaving(true);
         try {
             await window.appBridge.manager.resetPeerToDefault();
             await loadPeerSettings();
-            alert('Peer settings reset to default! Please restart the wallet for changes to take effect.');
+            restartToast('Reset to the default peer. Restart to apply.');
         } catch (error) {
             console.error('Failed to reset peer settings:', error);
-            alert('Failed to reset settings');
+            setFormError('Failed to reset settings.');
         } finally {
             setIsSaving(false);
         }
@@ -125,6 +156,13 @@ export function PeerSettingsModal({ isOpen, onClose }: PeerSettingsModalProps) {
                         </div>
                     )}
 
+                    {formError && (
+                        <div className="flex items-start gap-2 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">
+                            <AlertCircle className="mt-0.5 h-4 w-4 flex-shrink-0" />
+                            <span>{formError}</span>
+                        </div>
+                    )}
+
                     {/* Actions */}
                     <div className="flex gap-3">
                         <Button
@@ -148,11 +186,10 @@ export function PeerSettingsModal({ isOpen, onClose }: PeerSettingsModalProps) {
                     </div>
 
                     <p className="text-xs text-gray-500">
-                        Note: You'll need to restart the wallet after changing peer settings.
+                        Changes take effect after a restart.
                     </p>
                 </div>
             </div>
         </div>
     );
 }
-

@@ -1,4 +1,4 @@
-import {useState} from 'react';
+import {useEffect, useMemo, useState} from 'react';
 import {useNavigate} from 'react-router-dom';
 import {
   Check,
@@ -12,7 +12,10 @@ import {
   Wallet,
 } from 'lucide-react';
 import {useAccountsStore} from '../../store/accountsStore';
+import {useWalletStore} from '../../store/walletStore';
 import {accountDisplayName, type WalletAccount} from '../../lib/accounts';
+import {readCachedBalances, type CachedBalance} from '../../lib/accountBalanceCache';
+import {formatPearlAmount} from '../../lib/crypto';
 
 function truncateAddress(address: string): string {
   if (address.length <= 16) {
@@ -34,13 +37,55 @@ function AccountIcon({account}: {account: WalletAccount}) {
 
 export function AccountSwitcher() {
   const navigate = useNavigate();
-  const {accounts, activeAccountId, switchState, setActiveAccount} = useAccountsStore();
+  const {accounts, activeAccountId, switchState, setActiveAccount, network} = useAccountsStore();
+  const liveBalance = useWalletStore(state => state.balance);
   const [isOpen, setIsOpen] = useState(false);
 
   const active = accounts.find(account => account.id === activeAccountId) ?? null;
   const softwareAccounts = accounts.filter(account => account.kind === 'software');
   const hardwareAccounts = accounts.filter(account => account.kind === 'hardware');
   const isSwitching = switchState !== 'idle';
+
+  // Snapshot the cached balances each time the dropdown opens.
+  const cachedBalances = useMemo<Record<string, CachedBalance>>(
+    () => (isOpen ? readCachedBalances(network) : {}),
+    [isOpen, network]
+  );
+
+  useEffect(() => {
+    if (!isOpen) {
+      return;
+    }
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        setIsOpen(false);
+      }
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [isOpen]);
+
+  function AccountBalance({account}: {account: WalletAccount}) {
+    // Prefer the live value for the active software wallet.
+    const isActiveSoftware =
+      account.kind === 'software' && account.id === activeAccountId;
+    const entry = cachedBalances[account.id];
+    const value = isActiveSoftware && typeof liveBalance === 'number'
+      ? liveBalance
+      : entry?.balancePrl;
+
+    if (typeof value !== 'number') {
+      return null;
+    }
+    return (
+      <span
+        className="flex-shrink-0 text-xs tabular-nums text-gray-500"
+        title={entry ? `as of ${new Date(entry.updatedAt).toLocaleString()}` : undefined}
+      >
+        {formatPearlAmount(value)} PRL
+      </span>
+    );
+  }
 
   async function selectAccount(account: WalletAccount) {
     setIsOpen(false);
@@ -102,7 +147,7 @@ export function AccountSwitcher() {
       {isOpen && (
         <>
           <div className="fixed inset-0 z-20" onClick={() => setIsOpen(false)} />
-          <div className="absolute left-0 top-full z-30 mt-2 w-72 rounded-lg border border-gray-300 bg-white py-2 shadow-lg">
+          <div className="absolute left-0 top-full z-30 mt-2 max-h-[70vh] w-72 overflow-y-auto rounded-lg border border-gray-300 bg-white py-2 shadow-lg">
             {softwareAccounts.length > 0 && (
               <div>
                 <div className="px-4 py-1 text-xs font-semibold uppercase tracking-wide text-gray-400">
@@ -119,6 +164,7 @@ export function AccountSwitcher() {
                     <span className="flex-1 truncate text-gray-900">
                       {accountDisplayName(account)}
                     </span>
+                    <AccountBalance account={account} />
                     {account.id === activeAccountId && (
                       <>
                         <Check className="h-4 w-4 text-green-600" />
@@ -149,6 +195,7 @@ export function AccountSwitcher() {
                         {truncateAddress(account.address)}
                       </span>
                     )}
+                    <AccountBalance account={account} />
                     {account.id === activeAccountId && (
                       <>
                         <Check className="h-4 w-4 flex-shrink-0 text-green-600" />
