@@ -1,30 +1,31 @@
 import { useState, useEffect } from 'react';
-import { ArrowLeft, AlertTriangle } from 'lucide-react';
+import { ArrowLeft, AlertTriangle, RefreshCw } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useWalletStore } from '../store/walletStore';
+import { useAccountsStore } from '../store/accountsStore';
 import { QrcodeCanvas } from 'react-qrcode-pretty';
 import { CopyButton } from '@/components/ui/copy-button';
 import { Bech32Address } from '@/components/ui/bech32-address';
+import { getStableReceiveAddress, generateNewReceiveAddress } from '../lib/receiveAddress';
 
 export default function ReceiveTransaction() {
   const navigate = useNavigate();
   const { walletName } = useWalletStore();
+  const network = useAccountsStore(state => state.network);
   const [receiveAddress, setReceiveAddress] = useState<string>('');
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
-  const fetchReceiveAddress = async () => {
+  const fetchReceiveAddress = async (rotate = false) => {
     setIsLoading(true);
     setErrorMessage(null);
     try {
-      console.log('🔍 Fetching new receive address...');
-      // Get a new receiving address using getnewaddress RPC
-      const newAddress = await window.appBridge.wallet.getNewAddress();
-
-      console.log('✅ Got receive address:', newAddress);
-      setReceiveAddress(newAddress);
+      const address = rotate
+        ? await generateNewReceiveAddress(network, walletName)
+        : await getStableReceiveAddress(network, walletName);
+      setReceiveAddress(address);
     } catch (err) {
-      console.error('❌ Exception while fetching receive address:', err);
+      console.error('Exception while fetching receive address:', err);
       const message = err instanceof Error ? err.message : 'Unable to generate address';
       setReceiveAddress('');
       setErrorMessage(message);
@@ -35,6 +36,7 @@ export default function ReceiveTransaction() {
 
   useEffect(() => {
     fetchReceiveAddress();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   return (
@@ -107,6 +109,20 @@ export default function ReceiveTransaction() {
                     <Bech32Address address={receiveAddress} className="text-sm text-gray-900" />
                   </div>
                   <CopyButton value={receiveAddress} className="rounded-lg p-2" />
+                </div>
+                <div className="mt-3 flex items-center justify-between gap-3 border-t border-gray-100 pt-3">
+                  <span className="text-xs text-gray-500">
+                    This address stays the same until it receives funds.
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => void fetchReceiveAddress(true)}
+                    className="inline-flex flex-shrink-0 items-center gap-1 rounded-md border border-gray-200 px-2 py-1 text-xs text-gray-600 transition-colors hover:bg-gray-50"
+                    title="Generate a fresh address (improves privacy)"
+                  >
+                    <RefreshCw className="h-3 w-3" />
+                    New address
+                  </button>
                 </div>
               </div>
 

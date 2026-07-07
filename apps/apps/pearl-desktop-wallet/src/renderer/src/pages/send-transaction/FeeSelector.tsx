@@ -5,6 +5,7 @@ type FeeSelectorProps = {
   feeLevel: 'fast' | 'medium' | 'slow';
   isLoadingFees: boolean;
   currentFee: number | string;
+  estimateUnavailable?: boolean;
   onSelect: (level: 'fast' | 'medium' | 'slow') => void;
 };
 
@@ -12,6 +13,7 @@ export default function FeeSelector({
   feeLevel,
   isLoadingFees,
   currentFee,
+  estimateUnavailable = false,
   onSelect,
 }: FeeSelectorProps) {
   return (
@@ -93,6 +95,11 @@ export default function FeeSelector({
             )}
           </span>
         </div>
+        {estimateUnavailable && (
+          <div className="mt-2 rounded border border-amber-200 bg-amber-50 px-2 py-1 text-xs text-amber-800">
+            Live fee estimates unavailable — using the minimum fee rate.
+          </div>
+        )}
       </div>
     </div>
   );

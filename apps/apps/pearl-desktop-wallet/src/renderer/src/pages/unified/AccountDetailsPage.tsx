@@ -22,6 +22,7 @@ import {
   type WalletAccount,
 } from '../../lib/accounts';
 import {getHardwareWalletProviderName} from '../../lib/hardwareWallet';
+import {getStableReceiveAddress} from '../../lib/receiveAddress';
 import {useWalletStore} from '../../store/walletStore';
 
 // The /account route: details for the active account. Hardware accounts get
@@ -168,12 +169,12 @@ function HardwareAccountNameCard({account}: {account: WalletAccount & {kind: 'ha
 function SoftwareAccountDetails({account}: {account: WalletAccount & {kind: 'software'}}) {
   const navigate = useNavigate();
   const {walletName} = useWalletStore();
+  const network = useAccountsStore(state => state.network);
   const [receiveAddress, setReceiveAddress] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
-    window.appBridge.wallet
-      .getNewAddress()
+    getStableReceiveAddress(network, account.name)
       .then(address => {
         if (!cancelled) {
           setReceiveAddress(address);
@@ -187,7 +188,7 @@ function SoftwareAccountDetails({account}: {account: WalletAccount & {kind: 'sof
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [network, account.name]);
 
   return (
     <div className="flex h-full w-full flex-col bg-transparent">

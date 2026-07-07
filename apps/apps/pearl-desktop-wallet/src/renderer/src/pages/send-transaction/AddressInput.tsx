@@ -1,4 +1,5 @@
 import { AlertCircle } from 'lucide-react';
+import { PasteButton } from '@/components/ui/paste-button';
 import { AddressBookControl } from '../../components/contact-book/AddressBookControl';
 
 type AddressInputProps = {
@@ -12,14 +13,23 @@ export default function AddressInput({ address, onChange, error, onBlur }: Addre
   return (
     <div className="space-y-2">
       <label className="text-sm text-neutral-400">Recipient Address</label>
-      <input
-        type="text"
-        value={address}
-        onChange={e => onChange(e.target.value)}
-        onBlur={onBlur}
-        placeholder="Insert a recpipient address"
-        className="focus:border-brand-green focus:ring-brand-green/20 w-full rounded-lg border border-gray-300 bg-white px-4 py-3 font-mono text-sm text-gray-900 placeholder-gray-400 shadow-sm focus:outline-none focus:ring-2"
-      />
+      <div className="relative">
+        <input
+          type="text"
+          value={address}
+          onChange={e => onChange(e.target.value)}
+          onBlur={onBlur}
+          placeholder="Insert a recipient address"
+          className="focus:border-brand-green focus:ring-brand-green/20 w-full rounded-lg border border-gray-300 bg-white py-3 pl-4 pr-11 font-mono text-sm text-gray-900 placeholder-gray-400 shadow-sm focus:outline-none focus:ring-2"
+        />
+        <PasteButton
+          className="absolute right-2 top-1/2 -translate-y-1/2"
+          onPaste={text => {
+            onChange(text);
+            onBlur?.(); // fire blur validation on the pasted value
+          }}
+        />
+      </div>
       <AddressBookControl address={address} onSelect={onChange} />
       {error && (
         <div className="mt-1 flex items-center gap-1 rounded border border-red-700/30 px-2 py-1 text-xs text-red-400">

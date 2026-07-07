@@ -1,8 +1,11 @@
-import {History, Loader2, PenLine, Send, UserRound, X} from 'lucide-react';
+import {ExternalLink, History, Loader2, PenLine, Send, UserRound, X} from 'lucide-react';
 import {Button} from '@/components/ui/button';
 import {Bech32Address} from '@/components/ui/bech32-address';
+import {CopyButton} from '@/components/ui/copy-button';
+import {PasteButton} from '@/components/ui/paste-button';
 import {formatSatsAsPearl} from '../../lib/hardwareWallet.ts';
 import {satsToPearlInput} from '../../lib/sendGate.ts';
+import {explorerTxUrl} from '../../lib/explorer.ts';
 import {AddressBookControl} from '../../components/contact-book/AddressBookControl.tsx';
 import {AlertMessage} from './AlertMessage.tsx';
 import type {HardwareWalletSendModel, HardwareWalletViewActions} from './viewModel.ts';
@@ -75,7 +78,29 @@ export function HardwareSendPanel({
         {model.sendSuccess && (
           <div className="min-w-0 rounded-lg border border-green-200 bg-green-50 p-3 text-sm text-green-800">
             <div>Broadcast transaction</div>
-            <div className="mt-1 break-all font-mono text-xs sm:text-sm">{model.sendSuccess}</div>
+            <div className="mt-1 flex items-start gap-2">
+              <div className="min-w-0 flex-1 break-all font-mono text-xs sm:text-sm">
+                {model.sendSuccess}
+              </div>
+              <CopyButton
+                value={model.sendSuccess}
+                className="p-1"
+                iconClassName="h-4 w-4"
+                title="Copy transaction ID"
+              />
+              <button
+                type="button"
+                onClick={() =>
+                  window.appBridge.window.openExternal(
+                    explorerTxUrl(model.sendSuccess ?? '', model.activeSendNetwork)
+                  )
+                }
+                className="flex-shrink-0 rounded-md p-1 transition-colors hover:bg-green-100"
+                title="View on prlscan"
+              >
+                <ExternalLink className="h-4 w-4 text-green-700" />
+              </button>
+            </div>
             {model.lastSendFee && <div className="mt-1">Fee {model.lastSendFee}</div>}
           </div>
         )}
@@ -97,9 +122,22 @@ function EditStage({
   model: HardwareWalletSendModel;
 }) {
   const isPreparing = model.sendStage.step === 'preparing-review';
+  const inputsDisabled = model.hasPendingDeviceOperation || isPreparing;
+
+  function applyPercent(percent: bigint) {
+    actions.setSendAmount(satsToPearlInput((model.spendableBalanceSats * percent) / 100n));
+  }
 
   return (
-    <>
+    <form
+      className="space-y-4"
+      onSubmit={event => {
+        event.preventDefault();
+        if (!inputsDisabled && model.sendPreview.preview) {
+          actions.beginSendReview();
+        }
+      }}
+    >
       <div className="space-y-3">
         <label className="block text-sm font-medium text-gray-700">
           Amount
@@ -108,20 +146,56 @@ function EditStage({
             onChange={event => actions.setSendAmount(event.target.value)}
             placeholder="0.00"
             inputMode="decimal"
-            disabled={model.hasPendingDeviceOperation || isPreparing}
+            disabled={inputsDisabled}
             className="focus:border-brand-green mt-1 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 outline-none transition-colors"
           />
         </label>
 
+        <div className="flex items-center justify-between text-xs text-gray-500">
+          <span>
+            Spendable:{' '}
+            {model.isLoadingBalance ? '…' : formatSatsAsPearl(model.spendableBalanceSats)}
+          </span>
+        </div>
+        <div className="grid grid-cols-4 gap-2">
+          {([25n, 50n, 75n] as const).map(percent => (
+            <button
+              key={String(percent)}
+              type="button"
+              onClick={() => applyPercent(percent)}
+              disabled={inputsDisabled || model.spendableBalanceSats === 0n}
+              className="rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-xs text-gray-700 shadow-sm transition-all hover:border-gray-300 hover:bg-gray-50 disabled:opacity-50"
+            >
+              {String(percent)}%
+            </button>
+          ))}
+          <button
+            type="button"
+            onClick={() => actions.setSendAmount(satsToPearlInput(model.maxSpendableSats))}
+            disabled={inputsDisabled || model.maxSpendableSats === 0n}
+            title="Entire spendable balance minus the estimated network fee"
+            className="rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-xs text-gray-700 shadow-sm transition-all hover:border-gray-300 hover:bg-gray-50 disabled:opacity-50"
+          >
+            MAX
+          </button>
+        </div>
+
         <label className="block text-sm font-medium text-gray-700">
           Recipient
-          <input
-            value={model.sendAddress}
-            onChange={event => actions.setSendAddress(event.target.value)}
-            placeholder={model.activeSendNetwork === 'testnet' ? 'tprl1...' : 'prl1...'}
-            disabled={model.hasPendingDeviceOperation || isPreparing}
-            className="focus:border-brand-green mt-1 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 font-mono text-sm text-gray-900 outline-none transition-colors"
-          />
+          <div className="relative mt-1">
+            <input
+              value={model.sendAddress}
+              onChange={event => actions.setSendAddress(event.target.value)}
+              placeholder={model.activeSendNetwork === 'testnet' ? 'tprl1...' : 'prl1...'}
+              disabled={inputsDisabled}
+              className="focus:border-brand-green w-full rounded-lg border border-gray-200 bg-white py-2 pl-3 pr-10 font-mono text-sm text-gray-900 outline-none transition-colors"
+            />
+            <PasteButton
+              className="absolute right-1.5 top-1/2 -translate-y-1/2 p-1"
+              disabled={inputsDisabled}
+              onPaste={text => actions.setSendAddress(text)}
+            />
+          </div>
         </label>
 
         <AddressBookControl
@@ -150,10 +224,9 @@ function EditStage({
       )}
 
       <Button
-        type="button"
+        type="submit"
         className="w-full"
-        onClick={actions.beginSendReview}
-        disabled={model.hasPendingDeviceOperation || isPreparing || !model.sendPreview.preview}
+        disabled={inputsDisabled || !model.sendPreview.preview}
       >
         {isPreparing ? (
           <>
@@ -167,7 +240,7 @@ function EditStage({
           </>
         )}
       </Button>
-    </>
+    </form>
   );
 }
 

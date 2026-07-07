@@ -1,16 +1,20 @@
 import {useEffect, useState} from 'react';
-import {createPortal} from 'react-dom';
-import {History, Loader2, Send, UserRound, X} from 'lucide-react';
+import {History, Loader2, Send, UserRound} from 'lucide-react';
 import {Button} from '@/components/ui/button';
+import {Dialog, DialogContent, DialogHeader, DialogTitle} from '@/components/ui/dialog';
 import {useAddressBook} from '../../components/contact-book/useAddressBook';
 import {evaluateSendGate, satsToPearlInput, type SendGateDecision} from '../../lib/sendGate';
-import {parsePearlAmountToSats} from '../../lib/hardwareWallet.ts';
+import {formatSatsAsPearl, parsePearlAmountToSats} from '../../lib/hardwareWallet.ts';
 import type {AppNetwork, RecipientSendStatus} from '../../../../types/app-bridge';
 
 export interface SendConfirmState {
   amount: string;
   address: string;
   feeRate: number;
+  // Client-side estimate from the live UTXO set; null when it couldn't be
+  // computed. The wallet does its own coin selection at broadcast.
+  estimatedFeeSats: bigint | null;
+  totalDebitSats: bigint | null;
 }
 
 // PRL float → sats. The software wallet page works in floats; fixed 8-decimal
@@ -91,22 +95,41 @@ export function SendConfirmDialog({
   const isBlocked = gate?.blocked ?? false;
   const canConfirm = gate !== null && !isBlocked && !isSending;
 
-  return createPortal(
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-      <div className="w-full max-w-md rounded-lg border border-gray-300 bg-white shadow-xl">
-        <div className="flex items-center justify-between border-b border-gray-200 px-6 py-4">
-          <h2 className="text-xl font-bold text-gray-900">Confirm Send</h2>
-          <button
-            type="button"
-            onClick={onCancel}
-            disabled={isSending}
-            className="rounded-full p-1 text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-700 disabled:opacity-50"
-          >
-            <X className="h-5 w-5" />
-          </button>
-        </div>
+  return (
+    <Dialog
+      open
+      onOpenChange={open => {
+        if (!open && !isSending) {
+          onCancel();
+        }
+      }}
+    >
+      <DialogContent
+        className="max-w-md gap-0 bg-white p-0"
+        onEscapeKeyDown={event => {
+          if (isSending) {
+            event.preventDefault();
+          }
+        }}
+        onInteractOutside={event => {
+          if (isSending) {
+            event.preventDefault();
+          }
+        }}
+      >
+        <DialogHeader className="border-b border-gray-200 px-6 py-4">
+          <DialogTitle className="text-xl font-bold text-gray-900">Confirm Send</DialogTitle>
+        </DialogHeader>
 
-        <div className="space-y-4 p-6">
+        <form
+          className="space-y-4 p-6"
+          onSubmit={event => {
+            event.preventDefault();
+            if (canConfirm) {
+              onConfirm();
+            }
+          }}
+        >
           <div>
             <div className="mb-1 text-xs font-medium uppercase text-gray-500">Recipient</div>
             <div className="break-all font-mono text-sm text-gray-900">{confirm.address}</div>
@@ -138,9 +161,22 @@ export function SendConfirmDialog({
               </div>
             </div>
             <div className="rounded-md border border-gray-200 bg-gray-50 p-2">
-              <div className="mb-1 font-medium uppercase text-gray-500">Fee Rate</div>
+              <div className="mb-1 font-medium uppercase text-gray-500">Estimated Fee</div>
               <div className="break-all font-mono text-sm text-gray-900">
-                {confirm.feeRate.toFixed(8)} PRL/kB
+                {confirm.estimatedFeeSats !== null
+                  ? formatSatsAsPearl(confirm.estimatedFeeSats)
+                  : 'estimated at broadcast'}
+              </div>
+            </div>
+            <div className="col-span-2 rounded-md border border-gray-200 bg-gray-50 p-2">
+              <div className="mb-1 font-medium uppercase text-gray-500">Total Debit</div>
+              <div className="break-all font-mono text-sm text-gray-900">
+                {confirm.totalDebitSats !== null
+                  ? formatSatsAsPearl(confirm.totalDebitSats)
+                  : `${confirm.amount} PRL + network fee`}
+              </div>
+              <div className="mt-0.5 text-[11px] text-gray-400">
+                Fee rate {confirm.feeRate.toFixed(8)} PRL/kB
               </div>
             </div>
           </div>
@@ -210,9 +246,9 @@ export function SendConfirmDialog({
               Cancel
             </Button>
             <Button
-              type="button"
+              type="submit"
+              autoFocus
               className="flex-1 bg-green-600 hover:bg-green-700"
-              onClick={onConfirm}
               disabled={!canConfirm}
             >
               {isSending ? (
@@ -228,9 +264,8 @@ export function SendConfirmDialog({
               )}
             </Button>
           </div>
-        </div>
-      </div>
-    </div>,
-    document.body
+        </form>
+      </DialogContent>
+    </Dialog>
   );
 }

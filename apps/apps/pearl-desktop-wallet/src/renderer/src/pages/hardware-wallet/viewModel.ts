@@ -95,14 +95,18 @@ export interface HardwareWalletSendModel {
   deviceDisplayAddress: string | null;
   feeRate: number;
   hasPendingDeviceOperation: boolean;
+  isLoadingBalance: boolean;
   isSending: boolean;
   lastSendFee: string | null;
+  // Sweep upper bound: all confirmed UTXOs in, fee for one output deducted.
+  maxSpendableSats: bigint;
   sendAddress: string;
   sendAmount: string;
   sendError: string | null;
   sendPreview: SendPreviewState;
   sendStage: HardwareSendStage;
   sendSuccess: string | null;
+  spendableBalanceSats: bigint;
 }
 
 export interface ConnectedHardwareWalletModel {

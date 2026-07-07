@@ -14,8 +14,17 @@ import SendButton from './SendButton';
 import { SendConfirmDialog, type SendConfirmState } from './SendConfirmDialog';
 import { formatTxid } from '@/lib/crypto';
 import { getErrorMessage } from '@/lib/utils';
-import { maxSpendableSoftwareSats, spendableUtxoSats } from '../../lib/softwareSendEstimate';
+import {
+  estimateSoftwareSendFee,
+  maxSpendableSoftwareSats,
+  spendableUtxoSats,
+  type SoftwareSendEstimate,
+} from '../../lib/softwareSendEstimate';
 import { satsToPearlInput } from '../../lib/sendGate';
+import { formatSatsAsPearl, parsePearlAmountToSats } from '../../lib/hardwareWallet';
+import { saveSendDraft, takeSendDraft } from '../../lib/sendDraft';
+import { explorerTxUrl } from '../../lib/explorer';
+import { useAccountsStore } from '../../store/accountsStore';
 
 type FeeLevel = 'fast' | 'medium' | 'slow';
 const MEMPOOL_MIN_FEE_PER_VBYTE = 0.00001;
@@ -23,15 +32,21 @@ const MEMPOOL_MIN_FEE_PER_VBYTE = 0.00001;
 export default function SendTransaction() {
   const navigate = useNavigate();
   const { walletName, availableBalance, validateAddress, syncWalletData } = useWalletStore();
+  const network = useAccountsStore(state => state.network);
+  // A draft saved when a send was interrupted by the wallet lock.
+  const [restoredDraft] = useState(() => takeSendDraft());
+  const [showDraftNote, setShowDraftNote] = useState(restoredDraft !== null);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [txid, setTxid] = useState<string | null>(null);
+  const [lastSentAddress, setLastSentAddress] = useState<string | null>(null);
   const [isMaxSelected, setIsMaxSelected] = useState(false);
   const [confirmState, setConfirmState] = useState<SendConfirmState | null>(null);
   const [isSendingTx, setIsSendingTx] = useState(false);
 
   // Fee-related state
-  const [feeLevel, setFeeLevel] = useState<FeeLevel>('fast');
+  const [feeLevel, setFeeLevel] = useState<FeeLevel>(restoredDraft?.feeLevel ?? 'fast');
+  const [feeEstimateStale, setFeeEstimateStale] = useState(false);
   const [estimatedFees, setEstimatedFees] = useState<Record<FeeLevel, number>>({
     fast: 0.0001,
     medium: 0.00005,
@@ -59,10 +74,22 @@ export default function SendTransaction() {
     }
   }
 
+  // Estimate for a live amount string; null when it can't be computed.
+  function estimateFor(amount: string): SoftwareSendEstimate | null {
+    if (utxoSats === null) {
+      return null;
+    }
+    try {
+      return estimateSoftwareSendFee(utxoSats, parsePearlAmountToSats(amount.trim()), currentFee);
+    } catch {
+      return null;
+    }
+  }
+
   const form = useForm({
     defaultValues: {
-      amount: '',
-      address: '',
+      amount: restoredDraft?.amount ?? '',
+      address: restoredDraft?.address ?? '',
     },
     // Field validators have passed by the time onSubmit fires; instead of
     // sending immediately, open the confirmation dialog. The actual send
@@ -70,10 +97,13 @@ export default function SendTransaction() {
     onSubmit: async ({ value }: { value: { amount: string; address: string } }) => {
       setError(null);
       setSuccess(null);
+      const estimate = estimateFor(value.amount);
       setConfirmState({
         amount: value.amount.trim(),
         address: value.address.trim(),
         feeRate: estimatedFees[feeLevel],
+        estimatedFeeSats: estimate?.feeSats ?? null,
+        totalDebitSats: estimate?.totalDebitSats ?? null,
       });
     },
   });
@@ -89,6 +119,7 @@ export default function SendTransaction() {
         confirm.feeRate,
       );
       setTxid(txId);
+      setLastSentAddress(confirm.address);
       syncWalletData();
       void refreshUtxos();
       setSuccess('Transaction sent successfully!');
@@ -104,10 +135,12 @@ export default function SendTransaction() {
         errorMessage.includes('wallet is locked');
 
       if (isWalletLocked) {
+        // Preserve the composed transaction across the unlock round-trip.
+        saveSendDraft({ amount: confirm.amount, address: confirm.address, feeLevel });
         setError('Wallet is locked. Redirecting to unlock screen...');
         setTimeout(() => {
-          navigate('/unlock');
-        }, 3000);
+          navigate('/unlock', { state: { returnTo: '/send' } });
+        }, 1500);
       } else if (errorMessage.includes('mempool min fee not met')) {
         setError('Seems like the transaction fee is too low. This often means that the transaction is too large. Try setting up smaller transactions.')
       } else {
@@ -152,15 +185,17 @@ export default function SendTransaction() {
       const mediumFeeEstimate = isNaN(Number(mediumFee)) ? 0 : Number(mediumFee);
       const slowFeeEstimate = isNaN(Number(slowFee)) ? 0 : Number(slowFee);
 
-      console.log('fees:', fastFeeEstimate, mediumFeeEstimate, slowFeeEstimate);
-
       setEstimatedFees({
         fast: Math.max(fastFeeEstimate, MEMPOOL_MIN_FEE_PER_VBYTE),
         medium: Math.max(mediumFeeEstimate, MEMPOOL_MIN_FEE_PER_VBYTE),
         slow: Math.max(slowFeeEstimate, MEMPOOL_MIN_FEE_PER_VBYTE),
       });
+      setFeeEstimateStale(
+        fastFeeEstimate <= 0 && mediumFeeEstimate <= 0 && slowFeeEstimate <= 0
+      );
     } catch (error) {
       console.error('Failed to fetch fee estimates:', error);
+      setFeeEstimateStale(true);
     } finally {
       setIsLoadingFees(false);
     }
@@ -169,6 +204,10 @@ export default function SendTransaction() {
   useEffect(() => {
     fetchEstimatedFees();
     void refreshUtxos();
+    // The fee frozen into the confirm dialog is captured at submit time, so a
+    // background refresh never changes an in-flight confirmation.
+    const interval = setInterval(() => void fetchEstimatedFees(), 30_000);
+    return () => clearInterval(interval);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -258,6 +297,13 @@ export default function SendTransaction() {
               <form.Field
                 name="address"
                 validators={{
+                  // Only validate non-empty values on blur/change so the user
+                  // isn't warned mid-typing; the empty check stays on submit.
+                  onBlurAsync: async ({ value }) =>
+                    value.trim() ? validateAddressField(value) : undefined,
+                  onChangeAsyncDebounceMs: 500,
+                  onChangeAsync: async ({ value }) =>
+                    value.trim() ? validateAddressField(value) : undefined,
                   onSubmitAsync: async ({ value }) => validateAddressField(value),
                 }}
               >
@@ -281,16 +327,36 @@ export default function SendTransaction() {
                 feeLevel={feeLevel}
                 isLoadingFees={isLoadingFees}
                 currentFee={currentFee}
+                estimateUnavailable={feeEstimateStale}
                 onSelect={level => {
                   setFeeLevel(level);
                   setError(null); // Clear submission error when fee changes
                 }}
               />
 
+              {showDraftNote && (
+                <div className="flex items-center justify-between rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-xs text-blue-800">
+                  <span>Draft restored from before the wallet locked.</span>
+                  <button
+                    type="button"
+                    onClick={() => setShowDraftNote(false)}
+                    className="ml-2 font-medium hover:underline"
+                  >
+                    Dismiss
+                  </button>
+                </div>
+              )}
+
               {error && <ErrorAlert message={error} />}
 
               {success && txid && (
-                <SuccessBanner message={success} txid={txid} formatTxid={formatTxid} />
+                <SuccessBanner
+                  message={success}
+                  txid={txid}
+                  formatTxid={formatTxid}
+                  explorerUrl={explorerTxUrl(txid, network)}
+                  recipientAddress={lastSentAddress}
+                />
               )}
 
               <form.Subscribe
@@ -308,6 +374,15 @@ export default function SendTransaction() {
                         amount={amount}
                         address={address}
                         currentFee={currentFee}
+                        estimate={(() => {
+                          const estimate = estimateFor(amount);
+                          return estimate
+                            ? {
+                                fee: formatSatsAsPearl(estimate.feeSats),
+                                total: formatSatsAsPearl(estimate.totalDebitSats),
+                              }
+                            : null;
+                        })()}
                       />
                     )}
                     <SendButton

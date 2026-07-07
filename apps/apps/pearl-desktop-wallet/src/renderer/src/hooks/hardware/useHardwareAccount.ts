@@ -4,6 +4,7 @@ import {
   getBitcoinDeviceDisplayAddress,
   getHardwareWalletErrorMessage,
   getHardwareWalletProviderName,
+  maxSpendableHardwareSendSats,
   parsePearlAmountToSats,
   preloadHardwareWalletSupport,
   previewHardwarePearlSend,
@@ -257,6 +258,11 @@ export function useHardwareAccount(
     }
     return {spendableBalanceSats: balance, spendableUtxoCount: count};
   }, [hasPendingOutgoingHardwareSpend, utxos]);
+  const maxSpendableSats = useMemo(
+    () =>
+      hasPendingOutgoingHardwareSpend ? 0n : maxSpendableHardwareSendSats(utxos, feeRate),
+    [feeRate, hasPendingOutgoingHardwareSpend, utxos]
+  );
   const pendingBalanceSats = useMemo(
     () => getHardwareBalanceSats(addressInfo?.unconfirmedBalance),
     [addressInfo?.unconfirmedBalance]
@@ -699,14 +705,17 @@ export function useHardwareAccount(
         deviceDisplayAddress,
         feeRate,
         hasPendingDeviceOperation,
+        isLoadingBalance,
         isSending,
         lastSendFee,
+        maxSpendableSats,
         sendAddress,
         sendAmount,
         sendError,
         sendPreview,
         sendStage,
         sendSuccess,
+        spendableBalanceSats,
       }
     : null;
 

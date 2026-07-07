@@ -1,6 +1,6 @@
 import {useEffect, useState} from 'react';
 import {AlertCircle, Eye, EyeOff, Lock} from 'lucide-react';
-import {useNavigate} from 'react-router-dom';
+import {useLocation, useNavigate} from 'react-router-dom';
 import {getErrorMessage} from '../../lib/utils';
 import {NetworkSelector} from '../../components/NetworkSelector';
 import {SettingsButton} from '../../components/SettingsButton';
@@ -17,6 +17,8 @@ type Phase = 'checking' | 'idle' | 'unlocking' | 'starting-wallet';
  */
 export default function AppLockScreen() {
   const navigate = useNavigate();
+  const location = useLocation();
+  const returnTo = (location.state as {returnTo?: string} | null)?.returnTo ?? null;
   const [phase, setPhase] = useState<Phase>('checking');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -73,7 +75,7 @@ export default function AppLockScreen() {
     }
 
     // Migration prompts render inside the app shell after navigation.
-    navigate('/wallet');
+    navigate(returnTo ?? '/wallet');
   }
 
   async function handleUnlock(e: React.FormEvent) {

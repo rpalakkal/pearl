@@ -1,7 +1,7 @@
 import {useEffect, useState} from 'react';
-import {createPortal} from 'react-dom';
-import {AlertCircle, Pencil, Search, Trash2, UserPlus, X} from 'lucide-react';
+import {AlertCircle, Pencil, Search, Trash2, UserPlus} from 'lucide-react';
 import {Button} from '@/components/ui/button';
+import {Dialog, DialogContent, DialogHeader, DialogTitle} from '@/components/ui/dialog';
 import {getErrorMessage} from '@/lib/utils';
 import {getBitcoinDeviceDisplayAddress} from '../../lib/hardwareWallet.ts';
 import {useContactsStore} from '../../store/contactsStore';
@@ -164,30 +164,37 @@ export function AddressBookDialog({
 
   const isFormView = view.mode === 'add' || view.mode === 'edit';
 
-  // Rendered in a portal so the dialog never nests inside a send <form>,
-  // where its buttons and Enter presses would trigger the form's submit.
-  return createPortal(
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-      <div className="flex max-h-[80vh] w-full max-w-lg flex-col rounded-lg border border-gray-300 bg-white shadow-xl">
-        <div className="flex items-center justify-between border-b border-gray-200 px-6 py-4">
-          <h2 className="text-xl font-bold text-gray-900">
+  // Radix portals the content to <body>, so the dialog never nests inside a
+  // send <form>, where its buttons and Enter presses would trigger that
+  // form's submit.
+  return (
+    <Dialog
+      open
+      onOpenChange={open => {
+        if (!open) {
+          onClose();
+        }
+      }}
+    >
+      <DialogContent className="flex max-h-[80vh] w-full max-w-lg flex-col gap-0 bg-white p-0">
+        <DialogHeader className="border-b border-gray-200 px-6 py-4">
+          <DialogTitle className="text-xl font-bold text-gray-900">
             {view.mode === 'add'
               ? 'Add Contact'
               : view.mode === 'edit'
                 ? 'Edit Contact'
                 : 'Address Book'}
-          </h2>
-          <button
-            type="button"
-            onClick={onClose}
-            className="rounded-full p-1 text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-700"
-          >
-            <X className="h-5 w-5" />
-          </button>
-        </div>
+          </DialogTitle>
+        </DialogHeader>
 
         {isFormView ? (
-          <div className="space-y-4 p-6">
+          <form
+            className="space-y-4 p-6"
+            onSubmit={event => {
+              event.preventDefault();
+              void handleSave();
+            }}
+          >
             <div>
               <label className="mb-1 block text-sm font-medium text-gray-700">Name</label>
               <input
@@ -273,15 +280,14 @@ export function AddressBookDialog({
                 Cancel
               </Button>
               <Button
-                type="button"
+                type="submit"
                 className="flex-1 bg-green-600 hover:bg-green-700"
                 disabled={isSaving || !formName.trim() || !formAddress.trim()}
-                onClick={handleSave}
               >
                 {isSaving ? 'Saving...' : 'Save Contact'}
               </Button>
             </div>
-          </div>
+          </form>
         ) : (
           <>
             <div className="flex items-center gap-3 px-6 pt-4">
@@ -401,8 +407,7 @@ export function AddressBookDialog({
             </div>
           </>
         )}
-      </div>
-    </div>,
-    document.body
+      </DialogContent>
+    </Dialog>
   );
 }
