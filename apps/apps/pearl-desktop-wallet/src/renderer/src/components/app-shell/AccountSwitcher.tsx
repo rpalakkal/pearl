@@ -44,9 +44,7 @@ export function AccountSwitcher() {
   async function selectAccount(account: WalletAccount) {
     setIsOpen(false);
     await setActiveAccount(account.id);
-    // Until the pages are fully unified, hardware accounts live on the
-    // hardware page and software accounts on the dashboard.
-    navigate(account.kind === 'hardware' ? '/hardware-wallet' : '/wallet');
+    navigate('/wallet');
   }
 
   function addAccount(path: string) {

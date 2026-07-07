@@ -73,7 +73,7 @@ export default function AppLockScreen() {
     }
 
     // Migration prompts render inside the app shell after navigation.
-    navigate(account.kind === 'hardware' ? '/hardware-wallet' : '/wallet');
+    navigate('/wallet');
   }
 
   async function handleUnlock(e: React.FormEvent) {

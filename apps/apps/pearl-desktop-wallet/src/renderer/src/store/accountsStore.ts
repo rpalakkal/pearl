@@ -133,3 +133,10 @@ export const useAccountsStore = create<AccountsState>()((set, get) => ({
     set({switchError: null});
   },
 }));
+
+// The active account object (or null before enumeration / with no accounts).
+export function useActiveAccount(): WalletAccount | null {
+  return useAccountsStore(
+    state => state.accounts.find(account => account.id === state.activeAccountId) ?? null
+  );
+}

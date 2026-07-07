@@ -87,7 +87,7 @@ export default function WelcomePage() {
         return;
       }
       if (hasHardwareAccounts) {
-        navigate('/hardware-wallet', {replace: true});
+        navigate('/wallet', {replace: true});
         return;
       }
     } catch (error) {
