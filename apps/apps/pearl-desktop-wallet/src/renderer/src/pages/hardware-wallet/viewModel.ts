@@ -49,6 +49,9 @@ export interface HardwareWalletConnectionModel {
 export interface HardwareWalletBalanceModel {
   backfill: AddressBackfillStatus | null;
   backfillError: string | null;
+  // Progress height hasn't moved recently: the rescan is waiting on network
+  // peers for compact filters, not frozen.
+  backfillStalled: boolean;
   balanceError: string | null;
   balanceSource: 'oyster' | 'indexer' | null;
   canBackfill: boolean;

@@ -108,6 +108,15 @@ export function HardwareBalancePanel({
                   style={{width: `${backfillPercent(model)}%`}}
                 />
               </div>
+              {model.backfillStalled && (
+                <div className="mt-2 flex items-center gap-1.5">
+                  <Loader2 className="h-3 w-3 flex-shrink-0 animate-spin" />
+                  <span>
+                    Waiting for network peers — filter downloads are slow right now. The backfill
+                    resumes automatically; restarting the wallet cancels it.
+                  </span>
+                </div>
+              )}
             </div>
           )}
 

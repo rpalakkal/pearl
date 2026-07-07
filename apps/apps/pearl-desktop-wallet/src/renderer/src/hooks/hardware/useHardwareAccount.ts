@@ -137,6 +137,8 @@ export function useHardwareAccount(
   const [isSending, setIsSending] = useState(false);
   const [backfillStatus, setBackfillStatus] = useState<AddressBackfillStatus | null>(null);
   const [backfillError, setBackfillError] = useState<string | null>(null);
+  const [backfillStalled, setBackfillStalled] = useState(false);
+  const backfillProgressRef = useRef<{height: number; changedAt: number} | null>(null);
   const [feeRate, setFeeRate] = useState(0.0001);
 
   const hasPendingDeviceOperation =
@@ -160,6 +162,8 @@ export function useHardwareAccount(
     setVerifiedDeviceAddress(null);
     setBackfillStatus(null);
     setBackfillError(null);
+    setBackfillStalled(false);
+    backfillProgressRef.current = null;
     setCopiedAddress(false);
 
     if (account) {
@@ -303,15 +307,29 @@ export function useHardwareAccount(
     }
 
     const address = backfillStatus.address;
+    const STALL_AFTER_MS = 20_000;
     const interval = setInterval(async () => {
       try {
         const status = await window.appBridge.wallet.getRescanStatus(address);
         setBackfillStatus(status);
+
+        // A genesis rescan downloads compact filters from network peers; when
+        // peers are flaky the height stops moving. Surface that instead of
+        // showing a silently frozen progress bar.
+        const progress = backfillProgressRef.current;
+        if (!progress || progress.height !== status.currentHeight) {
+          backfillProgressRef.current = {height: status.currentHeight, changedAt: Date.now()};
+          setBackfillStalled(false);
+        } else if (status.status === 'running' && Date.now() - progress.changedAt > STALL_AFTER_MS) {
+          setBackfillStalled(true);
+        }
+
         if (status.status === 'complete' && account?.address === address) {
           void loadHardwareWalletBalance(account);
         }
       } catch (error) {
         setBackfillStatus(null);
+        setBackfillStalled(false);
         setBackfillError(
           getErrorMessage(error, 'Lost track of the backfill; it can be restarted.')
         );
@@ -328,6 +346,8 @@ export function useHardwareAccount(
     }
 
     setBackfillError(null);
+    setBackfillStalled(false);
+    backfillProgressRef.current = null;
     logHardwareWalletEvent('backfill:start', hardwareAccountLogContext(account));
 
     try {
@@ -610,6 +630,7 @@ export function useHardwareAccount(
     ? {
         backfill: backfillStatus,
         backfillError,
+        backfillStalled,
         balanceError,
         balanceSource,
         canBackfill: balanceSource === 'oyster',
