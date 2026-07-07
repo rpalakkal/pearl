@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import {
   getBlockbookBaseUrl,
+  normalizeBlockbookAddressTransactions,
   normalizeBlockbookFeeRate,
   normalizeBlockbookFeeTarget,
   normalizeBlockbookNetwork,
@@ -46,3 +47,119 @@ test('validates transaction hex and normalizes broadcast txid responses', () => 
 });
 
 // ---- Address transaction history normalizer ----
+
+// ---- Address transaction history normalizer ----
+
+const OUR = 'prl1qouraddress';
+const OTHER = 'prl1qotheraddress';
+
+function historyTx(overrides: Record<string, unknown>) {
+  return {
+    txid: '11'.repeat(32),
+    vin: [{addresses: [OTHER], value: '200000000'}],
+    vout: [{addresses: [OUR], value: '100000000'}],
+    blockHash: 'ab'.repeat(32),
+    blockHeight: 100,
+    confirmations: 3,
+    blockTime: 1700000000,
+    fees: '250',
+    ...overrides,
+  };
+}
+
+test('normalizes a received transaction from address history', () => {
+  const {transactions, hasMore} = normalizeBlockbookAddressTransactions(
+    {page: 1, totalPages: 1, transactions: [historyTx({})]},
+    OUR
+  );
+  assert.equal(hasMore, false);
+  assert.equal(transactions.length, 1);
+  const tx = transactions[0];
+  assert.equal(tx.type, 'received');
+  assert.equal(tx.amount, 1);
+  assert.equal(tx.fee, 0);
+  assert.equal(tx.confirmations, 3);
+  assert.equal(tx.time, 1700000000 * 1000);
+  assert.equal(tx.address, OUR);
+});
+
+test('normalizes a sent transaction with change and fee', () => {
+  const {transactions} = normalizeBlockbookAddressTransactions(
+    {
+      page: 1,
+      totalPages: 1,
+      transactions: [
+        historyTx({
+          vin: [{addresses: [OUR], value: '200000000'}],
+          vout: [
+            {addresses: [OTHER], value: '150000000'},
+            {addresses: [OUR], value: '49999750'}, // change
+          ],
+        }),
+      ],
+    },
+    OUR
+  );
+  const tx = transactions[0];
+  assert.equal(tx.type, 'sent');
+  assert.equal(tx.amount, 1.5);
+  assert.equal(tx.fee, 0.0000025);
+  assert.equal(tx.address, OTHER);
+});
+
+test('self-send counts outputs back to us as the amount', () => {
+  const {transactions} = normalizeBlockbookAddressTransactions(
+    {
+      transactions: [
+        historyTx({
+          vin: [{addresses: [OUR], value: '100000000'}],
+          vout: [{addresses: [OUR], value: '99999750'}],
+        }),
+      ],
+    },
+    OUR
+  );
+  assert.equal(transactions[0].type, 'sent');
+  assert.equal(transactions[0].amount, 0.9999975);
+});
+
+test('mempool transactions tolerate missing block fields', () => {
+  const {transactions} = normalizeBlockbookAddressTransactions(
+    {
+      transactions: [
+        historyTx({blockHash: undefined, blockTime: undefined, confirmations: 0}),
+      ],
+    },
+    OUR
+  );
+  const tx = transactions[0];
+  assert.equal(tx.confirmations, 0);
+  assert.equal(tx.blockhash, '');
+  assert.ok(tx.time > 0);
+});
+
+test('malformed history entries are dropped, not fatal', () => {
+  const {transactions} = normalizeBlockbookAddressTransactions(
+    {
+      transactions: [historyTx({}), {txid: 'nope'}, null, 42],
+    },
+    OUR
+  );
+  assert.equal(transactions.length, 1);
+});
+
+test('pagination fields drive hasMore', () => {
+  const paged = normalizeBlockbookAddressTransactions(
+    {page: 1, totalPages: 3, transactions: []},
+    OUR
+  );
+  assert.equal(paged.hasMore, true);
+
+  const missing = normalizeBlockbookAddressTransactions({transactions: []}, OUR);
+  assert.equal(missing.hasMore, false);
+});
+
+test('address history rejects non-object payloads', () => {
+  assert.throws(() => normalizeBlockbookAddressTransactions(null, OUR));
+  assert.throws(() => normalizeBlockbookAddressTransactions('nope', OUR));
+});

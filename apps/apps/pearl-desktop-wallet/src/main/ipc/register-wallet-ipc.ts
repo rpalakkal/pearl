@@ -82,10 +82,12 @@ function registerWalletIpc(ms: ManagerService) {
     async (_event, request: HardwareWalletAccountRequest) =>
       HardwareWalletService.getBalance(request, await ms.ensureChainHost())
   );
+  // History is indexer-first and must not force a chain-host startup; the
+  // local wallet (when one runs) is only its fallback.
   ipcMain.handle(
     'hardware-wallet-get-transactions',
-    async (_event, request: HardwareWalletTransactionsRequest) =>
-      HardwareWalletService.getTransactions(request, await ms.ensureChainHost())
+    (_event, request: HardwareWalletTransactionsRequest) =>
+      HardwareWalletService.getTransactions(request, ms.getWalletServiceIfRunning())
   );
   ipcMain.handle(
     'hardware-wallet-broadcast-transaction',

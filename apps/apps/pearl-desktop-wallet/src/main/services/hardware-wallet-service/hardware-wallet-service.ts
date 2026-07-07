@@ -9,6 +9,7 @@ import {
   type BlockbookAddressInfo,
   type BlockbookUtxo,
 } from '../../clients/blockbook-normalizers.ts';
+import {BlockbookClient} from '../../clients/blockbook-client.ts';
 import {recordSend} from '../../config/send-history.ts';
 import type {WalletService} from '../wallet-service/wallet-service.ts';
 import type {ListUnspentResult} from '../wallet-service/wallet-rpc-methods.ts';
@@ -153,16 +154,34 @@ export const HardwareWalletService = {
     return getHardwareWalletBalance(request, walletService);
   },
 
-  // Transaction history for a hardware address, classified from that
-  // address's perspective by the wallet's getaddresshistory RPC (watch-only
-  // entries appear after import + backfill).
+  // Transaction history for a hardware address. The indexer is the primary
+  // source: its global view avoids per-wallet transaction-store gaps (each
+  // wallet only knows what its own scans covered). The local wallet's
+  // getaddresshistory view — classified from the address's perspective — is
+  // the offline fallback.
   async getTransactions(
     request: HardwareWalletTransactionsRequest,
-    walletService: WalletService
+    walletService: WalletService | null
   ): Promise<HardwareWalletTransactionsResult> {
     const account = normalizeHardwareAccount(request);
     const page = Math.max(1, request.page ?? 1);
     const pageSize = Math.max(1, Math.min(100, request.pageSize ?? 25));
+
+    try {
+      const history = await BlockbookClient.getAddressTransactions(
+        account.address,
+        account.network,
+        page,
+        pageSize
+      );
+      return {...history, source: 'indexer', walletSyncing: false};
+    } catch (error) {
+      console.error('Indexer history lookup failed, falling back to wallet:', error);
+    }
+
+    if (!walletService) {
+      throw new Error('Transaction history is unavailable: indexer unreachable and no wallet running');
+    }
 
     await walletService.importPublicKey(account.publicKey, true);
     const [history, walletSyncing] = await Promise.all([

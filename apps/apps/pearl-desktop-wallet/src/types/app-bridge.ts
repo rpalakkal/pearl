@@ -157,7 +157,9 @@ interface HardwareWalletTransactionsRequest extends HardwareWalletAccountRequest
 interface HardwareWalletTransactionsResult {
   transactions: Transaction[];
   hasMore: boolean;
-  source: HardwareBalanceSource;
+  // History is indexer-first (global view, no per-wallet store gaps) with
+  // the local wallet as offline fallback.
+  source: 'indexer' | 'oyster';
   walletSyncing: boolean;
 }
 

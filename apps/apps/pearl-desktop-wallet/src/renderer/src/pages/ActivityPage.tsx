@@ -72,9 +72,10 @@ export default function ActivityPage({onBack}: ActivityPageProps) {
             {hardware.error}
           </div>
         )}
-        {isHardware && hardware.walletSyncing && !hardware.error && (
-          <div className="mb-4 rounded-lg border border-blue-200 bg-blue-50 p-3 text-sm text-blue-900">
-            The local wallet is still syncing the chain — history appears when it completes.
+        {isHardware && hardware.source === 'oyster' && !hardware.error && (
+          <div className="mb-4 text-center text-xs text-gray-400">
+            Showing the local wallet's view — the network indexer is unreachable.
+            {hardware.walletSyncing && ' The wallet is still syncing; history may be incomplete.'}
           </div>
         )}
         {loading && activities.length === 0 ? (

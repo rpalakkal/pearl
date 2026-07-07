@@ -1,9 +1,7 @@
 import {useEffect, useRef, useState} from 'react';
 import {hardwareAccountKey} from '../../pages/hardware-wallet/pageModel.ts';
-import {useWalletStore} from '../../store/walletStore.ts';
 import {getErrorMessage} from '../../lib/utils.ts';
 import type {HardwareWalletAddress} from '../../lib/hardwareWallet.ts';
-import type {HardwareBalanceSource} from '../../../../types/app-bridge.ts';
 import type {Transaction} from '../../../../types/transaction.ts';
 
 const PAGE_SIZE = 10;
@@ -21,7 +19,7 @@ export function useHardwareActivity(account: HardwareWalletAddress | null) {
   const [activities, setActivities] = useState<Transaction[]>([]);
   const [loading, setLoading] = useState(false);
   const [hasMore, setHasMore] = useState(false);
-  const [source, setSource] = useState<HardwareBalanceSource | null>(null);
+  const [source, setSource] = useState<'indexer' | 'oyster' | null>(null);
   const [walletSyncing, setWalletSyncing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const pageRef = useRef(1);
@@ -65,11 +63,8 @@ export function useHardwareActivity(account: HardwareWalletAddress | null) {
     }
   }
 
-  // Defer loads while the backing wallet is scanning blocks: its write lock
-  // is held for whole batches and importpubkey-backed reads would time out.
-  const syncPhase = useWalletStore(state => state.syncPhase);
-  const recoveryBlocking = syncPhase === 'blocks';
-
+  // History is indexer-first, so loads don't touch the local wallet's locks
+  // and can fire regardless of the wallet's sync phase.
   useEffect(() => {
     setActivities([]);
     setHasMore(false);
@@ -77,26 +72,18 @@ export function useHardwareActivity(account: HardwareWalletAddress | null) {
     setWalletSyncing(false);
     setError(null);
     pageRef.current = 1;
-    if (account && !recoveryBlocking) {
+    if (account) {
       void loadPage(1);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [accountKey]);
-
-  // Deferred initial load once recovery finishes.
-  useEffect(() => {
-    if (account && !recoveryBlocking && activities.length === 0 && !loading && !error) {
-      void loadPage(1);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [recoveryBlocking, accountKey]);
 
   return {
     activities,
     loading,
     hasMore,
     source,
-    walletSyncing: walletSyncing || recoveryBlocking,
+    walletSyncing,
     error,
     loadMore: () => {
       pageRef.current += 1;
