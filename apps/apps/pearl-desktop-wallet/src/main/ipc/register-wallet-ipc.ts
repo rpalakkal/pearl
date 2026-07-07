@@ -75,22 +75,22 @@ function registerWalletIpc(ms: ManagerService) {
     (_event, numBlocks: number, network?: 'mainnet' | 'testnet') =>
       BlockbookClient.estimateFee(numBlocks, network)
   );
-  // Hardware wallet handlers must not require an initialized software wallet:
-  // in hardware-only mode they fall back to the external indexer.
+  // Hardware wallet handlers always run against a local wallet: the running
+  // user wallet when there is one, otherwise the hidden chain-host wallet.
   ipcMain.handle(
     'hardware-wallet-get-balance',
-    (_event, request: HardwareWalletAccountRequest) =>
-      HardwareWalletService.getBalance(request, ms.getWalletServiceIfRunning())
+    async (_event, request: HardwareWalletAccountRequest) =>
+      HardwareWalletService.getBalance(request, await ms.ensureChainHost())
   );
   ipcMain.handle(
     'hardware-wallet-get-transactions',
-    (_event, request: HardwareWalletTransactionsRequest) =>
-      HardwareWalletService.getTransactions(request, ms.getWalletServiceIfRunning())
+    async (_event, request: HardwareWalletTransactionsRequest) =>
+      HardwareWalletService.getTransactions(request, await ms.ensureChainHost())
   );
   ipcMain.handle(
     'hardware-wallet-broadcast-transaction',
-    (_event, request: HardwareWalletBroadcastRequest) =>
-      HardwareWalletService.broadcastTransaction(request, ms.getWalletServiceIfRunning())
+    async (_event, request: HardwareWalletBroadcastRequest) =>
+      HardwareWalletService.broadcastTransaction(request, await ms.ensureChainHost())
   );
 }
 

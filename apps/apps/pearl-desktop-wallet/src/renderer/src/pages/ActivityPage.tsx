@@ -72,9 +72,9 @@ export default function ActivityPage({onBack}: ActivityPageProps) {
             {hardware.error}
           </div>
         )}
-        {isHardware && hardware.source === 'indexer' && !hardware.error && (
-          <div className="mb-4 text-center text-xs text-gray-400">
-            History from the network indexer (no local wallet running)
+        {isHardware && hardware.walletSyncing && !hardware.error && (
+          <div className="mb-4 rounded-lg border border-blue-200 bg-blue-50 p-3 text-sm text-blue-900">
+            The local chain host is syncing — history appears when it completes.
           </div>
         )}
         {loading && activities.length === 0 ? (

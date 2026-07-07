@@ -23,6 +23,7 @@ export function useHardwareWalletBalanceState(fetchBalanceData: FetchHardwareWal
   const [addressInfo, setAddressInfo] = useState<BlockbookAddressInfo | null>(null);
   const [balanceError, setBalanceError] = useState<string | null>(null);
   const [balanceSource, setBalanceSource] = useState<HardwareBalanceSource | null>(null);
+  const [walletSyncing, setWalletSyncing] = useState(false);
   const [isLoadingBalance, setIsLoadingBalance] = useState(false);
   const [utxos, setUtxos] = useState<BlockbookUtxo[]>([]);
 
@@ -30,16 +31,19 @@ export function useHardwareWalletBalanceState(fetchBalanceData: FetchHardwareWal
     info,
     utxos: addressUtxos,
     source,
+    walletSyncing: syncing,
   }: HardwareWalletBalanceData) => {
     setAddressInfo(info);
     setUtxos(addressUtxos);
     setBalanceSource(source);
+    setWalletSyncing(syncing);
   };
 
   const clearHardwareBalance = () => {
     setAddressInfo(null);
     setUtxos([]);
     setBalanceSource(null);
+    setWalletSyncing(false);
   };
 
   const invalidateBalanceRequests = () => {
@@ -92,6 +96,7 @@ export function useHardwareWalletBalanceState(fetchBalanceData: FetchHardwareWal
     addressInfo,
     balanceError,
     balanceSource,
+    walletSyncing,
     clearHardwareBalance,
     invalidateBalanceRequests,
     isLoadingBalance,

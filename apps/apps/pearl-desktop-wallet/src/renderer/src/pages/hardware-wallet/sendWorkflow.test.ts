@@ -32,6 +32,7 @@ function balance(overrides: Partial<HardwareWalletBalanceData> = {}): HardwareWa
     },
     utxos: UTXOS,
     source: 'oyster',
+    walletSyncing: false,
     ...overrides,
   };
 }

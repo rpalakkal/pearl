@@ -1,7 +1,6 @@
 import type {RecipientSendStatus} from '../../types/app-bridge';
 import type {Transaction} from '../../types/transaction';
 import type {WalletService} from './wallet-service/wallet-service';
-import {BlockbookClient} from '../clients/blockbook-client';
 import {getRecordsForRecipient, markSendConfirmed} from '../config/send-history';
 import {
   deriveRecipientStatus,
@@ -11,14 +10,15 @@ import {
 /**
  * Returns whether (and how) this user has previously sent to a recipient.
  * Confirmed history records answer immediately; unconfirmed ones are lazily
- * refreshed via the local wallet's transaction list when it is running, or
- * per-txid Blockbook lookups in hardware-only mode. Lookup failures count as
- * still-unconfirmed so the large-send gate fails closed.
+ * refreshed via the local wallet's transaction list. A fresh chain host may
+ * not know old txids until their address is backfilled — those records stay
+ * unconfirmed, so the large-send gate fails closed and self-heals once the
+ * backfill lands the transactions in the wallet's view.
  */
 export async function getRecipientSendStatus(
   address: string,
   network: 'mainnet' | 'testnet',
-  walletService: WalletService | null
+  walletService: WalletService
 ): Promise<RecipientSendStatus> {
   const records = getRecordsForRecipient(address, network);
 
@@ -28,35 +28,18 @@ export async function getRecipientSendStatus(
   }
 
   let walletTransactions: Transaction[] | null = null;
-  if (walletService) {
-    try {
-      walletTransactions = await walletService.listAllTransactions();
-    } catch (error) {
-      console.error('Failed to read wallet transactions for send history:', error);
-    }
+  try {
+    walletTransactions = await walletService.listAllTransactions();
+  } catch (error) {
+    console.error('Failed to read wallet transactions for send history:', error);
   }
 
   const unconfirmed = records.filter(record => record.confirmedAt === undefined);
   const confirmationsByTxid = new Map<string, number>();
 
-  if (unconfirmed.length > 0) {
-    if (walletTransactions) {
-      for (const tx of walletTransactions) {
-        confirmationsByTxid.set(tx.txid, tx.confirmations);
-      }
-    } else {
-      await Promise.all(
-        unconfirmed.map(async record => {
-          try {
-            confirmationsByTxid.set(
-              record.txid,
-              await BlockbookClient.getTransactionConfirmations(record.txid, network)
-            );
-          } catch {
-            // Fail closed: an unreachable indexer leaves the record pending.
-          }
-        })
-      );
+  if (unconfirmed.length > 0 && walletTransactions) {
+    for (const tx of walletTransactions) {
+      confirmationsByTxid.set(tx.txid, tx.confirmations);
     }
 
     for (const record of unconfirmed) {

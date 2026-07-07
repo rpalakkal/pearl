@@ -33,6 +33,26 @@ interface WalletData {
 
 const baseWalletDir = path.join(os.homedir(), '.pearl-wallet', 'wallet-data');
 
+// Reserved name (fs-form) for the hidden chain-host wallet: an auto-created
+// wallet with a discarded random seed, used purely as a local chain backend
+// for hardware accounts when no user wallet is running. Never listed, never
+// selectable, and user wallets may not take its name — the create path's
+// leftover-dir handling would otherwise delete its wallet.db.
+const CHAIN_HOST_NAME = '.chain-host';
+
+function isReservedWalletName(name: string): boolean {
+  return displayToFs(name) === CHAIN_HOST_NAME;
+}
+
+// Chain-level SPV state files that are wallet-independent and safe to copy
+// between wallet data dirs (same set the create/import flow preserves).
+const CHAIN_STATE_FILES = [
+  'block_headers.bin',
+  'reg_filter_headers.bin',
+  'neutrino.db',
+  'peers.json',
+];
+
 function getBaseConfig() {
   const networkConfig = getCurrentNetworkConfig();
   return {
@@ -53,6 +73,19 @@ class ManagerService implements ManagerApi {
   private walletService: WalletService | null = null;
   private currentWallet: WalletData | null = null;
   private walletProcess: WalletProcess | null = null;
+  private chainHostActive = false;
+  private chainHostStartPromise: Promise<WalletService> | null = null;
+
+  // Serializes every wallet-process lifecycle change. Hardware IPC calls can
+  // race the account switcher for port 8335; each lifecycle method queues
+  // behind whatever transition is in flight.
+  private transition: Promise<unknown> = Promise.resolve();
+
+  private runTransition<T>(work: () => Promise<T>): Promise<T> {
+    const next = this.transition.catch(() => {}).then(work);
+    this.transition = next;
+    return next;
+  }
 
   private async loadWallet(walletName: string, mode: 'create' | 'open') {
     const walletDataDir = path.join(baseWalletDir, displayToFs(walletName));
@@ -93,6 +126,117 @@ class ManagerService implements ManagerApi {
     if (this.walletProcess && this.walletProcess.getStatus().isRunning) {
       await this.walletProcess.stop(options);
     }
+    this.chainHostActive = false;
+  }
+
+  // Returns a running wallet service for hardware account reads/broadcasts,
+  // starting the hidden chain-host wallet when no user wallet is running.
+  // Single-flight: concurrent hardware IPC calls share one startup.
+  async ensureChainHost(): Promise<WalletService> {
+    const running = this.getWalletServiceIfRunning();
+    if (running) {
+      return running;
+    }
+
+    if (!this.chainHostStartPromise) {
+      this.chainHostStartPromise = this.runTransition(() => this.startChainHost()).finally(() => {
+        this.chainHostStartPromise = null;
+      });
+    }
+    return this.chainHostStartPromise;
+  }
+
+  private async startChainHost(): Promise<WalletService> {
+    // A user wallet may have started while we queued behind the transition.
+    const running = this.getWalletServiceIfRunning();
+    if (running) {
+      return running;
+    }
+
+    const walletDataDir = path.join(baseWalletDir, CHAIN_HOST_NAME);
+    const networkConfig = getCurrentNetworkConfig();
+    const walletDbPath = path.join(walletDataDir, networkConfig.dataSubdir, 'wallet.db');
+    const config = { ...getBaseConfig(), dataDir: walletDataDir };
+
+    this.walletService = new WalletService(config);
+    this.walletProcess = new WalletProcess(config, this.walletService);
+    // The chain host is not a user wallet: getWalletsStats() keeps reporting
+    // no selected wallet while it runs.
+    this.currentWallet = null;
+
+    if (!fs.existsSync(walletDbPath)) {
+      if (appLock.getStatus() !== 'unlocked') {
+        throw new Error('Unlock the app before using hardware accounts');
+      }
+
+      fs.mkdirSync(path.dirname(walletDbPath), { recursive: true });
+      this.seedChainStateFrom(path.dirname(walletDbPath), networkConfig.dataSubdir);
+
+      // Reuse an existing vaulted passphrase (a second network's create must
+      // not clobber the first's entry); otherwise generate and store one.
+      // The seed printed by wallet creation is deliberately discarded — this
+      // wallet holds no user funds, only watch-only hardware imports.
+      let passphrase = appLock.getWalletPassphrase(CHAIN_HOST_NAME);
+      if (!passphrase) {
+        passphrase = appLock.generateWalletPassphrase();
+        appLock.storeWalletPassphrase(CHAIN_HOST_NAME, passphrase);
+      }
+
+      const createResult = await this.walletProcess.createWalletAndGetSeed(passphrase);
+      if (!createResult.success) {
+        throw new Error(
+          `Failed to create chain host wallet: ${'error' in createResult ? createResult.error : 'Unknown error'}`
+        );
+      }
+      console.log('[ManagerService] Chain host wallet created');
+    }
+
+    await this.startWalletProcess();
+    this.chainHostActive = true;
+    console.log('[ManagerService] Chain host running');
+
+    return this.ensureWalletService();
+  }
+
+  // Copies wallet-independent chain state (headers, filter headers, peers)
+  // from the most recently synced wallet into a fresh chain-host dir so the
+  // host doesn't re-download the whole header chain. Only runs while no
+  // wallet process is up, so the source files are cold.
+  private seedChainStateFrom(targetNetworkDir: string, dataSubdir: string) {
+    try {
+      let newestDir: string | null = null;
+      let newestMtime = 0;
+
+      for (const entry of fs.readdirSync(baseWalletDir, { withFileTypes: true })) {
+        if (!entry.isDirectory() || entry.name === CHAIN_HOST_NAME) {
+          continue;
+        }
+        const headersPath = path.join(baseWalletDir, entry.name, dataSubdir, 'block_headers.bin');
+        if (!fs.existsSync(headersPath)) {
+          continue;
+        }
+        const mtime = fs.statSync(headersPath).mtimeMs;
+        if (mtime > newestMtime) {
+          newestMtime = mtime;
+          newestDir = path.join(baseWalletDir, entry.name, dataSubdir);
+        }
+      }
+
+      if (!newestDir) {
+        return;
+      }
+
+      for (const file of CHAIN_STATE_FILES) {
+        const source = path.join(newestDir, file);
+        if (fs.existsSync(source)) {
+          fs.copyFileSync(source, path.join(targetNetworkDir, file));
+        }
+      }
+      console.log(`[ManagerService] Seeded chain host headers from ${newestDir}`);
+    } catch (error) {
+      // Seeding is an optimization; a fresh header sync is the fallback.
+      console.error('Failed to seed chain host headers:', error);
+    }
   }
 
   async startWalletProcess() {
@@ -109,11 +253,13 @@ class ManagerService implements ManagerApi {
   }
 
   async lockWallet() {
-    if (this.walletService) {
-      await this.walletService.lockWallet();
-    }
-    await this.stopWalletProcess();
-    this.currentWallet = null;
+    return this.runTransition(async () => {
+      if (this.walletService && !this.chainHostActive) {
+        await this.walletService.lockWallet();
+      }
+      await this.stopWalletProcess();
+      this.currentWallet = null;
+    });
   }
 
   // Fast path for the Lock button while the wallet is mid-block-recovery. The
@@ -122,8 +268,10 @@ class ManagerService implements ManagerApi {
   // bbolt write txns are atomic at commit; a mid-batch kill just replays that
   // batch on the next open.
   async forceLockWallet() {
-    await this.stopWalletProcess({ force: true });
-    this.currentWallet = null;
+    return this.runTransition(async () => {
+      await this.stopWalletProcess({ force: true });
+      this.currentWallet = null;
+    });
   }
 
   ensureWalletService() {
@@ -134,10 +282,8 @@ class ManagerService implements ManagerApi {
     return ws;
   }
 
-  // Hardware wallet flows must keep working when no software wallet has been
-  // loaded (hardware-only mode), so they take the local wallet only when its
-  // process is actually running and fall back to the external indexer
-  // otherwise.
+  // Returns the running wallet service (a user wallet or the chain host), or
+  // null when no oyster process is up.
   getWalletServiceIfRunning(): WalletService | null {
     if (!this.walletService || !this.walletProcess?.getStatus().isRunning) {
       return null;
@@ -152,6 +298,10 @@ class ManagerService implements ManagerApi {
   }
 
   async selectWallet(walletName: string): Promise<{ passphraseAvailable: boolean }> {
+    if (isReservedWalletName(walletName)) {
+      throw new Error(`"${walletName}" is a reserved wallet name`);
+    }
+
     // Validate peer before starting wallet
     const peerAddress = getPeerAddress();
     const peerPort = getPeerPort();
@@ -166,20 +316,22 @@ class ManagerService implements ManagerApi {
 
     console.log(`[ManagerService] ✅ Peer validation passed, starting wallet...`);
 
-    try {
-      await this.stopWalletProcess();
-    } catch (error) {
-      console.log('Failed to stop wallet process:', error);
-    }
+    return this.runTransition(async () => {
+      try {
+        await this.stopWalletProcess();
+      } catch (error) {
+        console.log('Failed to stop wallet process:', error);
+      }
 
-    // Load/start failures now propagate so the renderer can show a real
-    // error instead of retrying against a dead service.
-    await this.loadWallet(walletName, 'open');
-    await this.startWalletProcess();
+      // Load/start failures now propagate so the renderer can show a real
+      // error instead of retrying against a dead service.
+      await this.loadWallet(walletName, 'open');
+      await this.startWalletProcess();
 
-    this.currentWallet = { name: walletName };
+      this.currentWallet = { name: walletName };
 
-    return { passphraseAvailable: await this.unlockFromVault(walletName) };
+      return { passphraseAvailable: await this.unlockFromVault(walletName) };
+    });
   }
 
   // Unlocks the running wallet with its vaulted passphrase, when the app is
@@ -232,33 +384,38 @@ class ManagerService implements ManagerApi {
   async create(options: { name: string; password?: string }) {
     const { name } = options;
 
+    if (isReservedWalletName(name)) {
+      throw new Error(`"${name}" is a reserved wallet name`);
+    }
     if (appLock.getStatus() !== 'unlocked') {
       throw new Error('Unlock the app before creating a wallet');
     }
 
-    await this.stopWalletProcess();
+    return this.runTransition(async () => {
+      await this.stopWalletProcess();
 
-    await this.loadWallet(name, 'create');
+      await this.loadWallet(name, 'create');
 
-    const passphrase = appLock.generateWalletPassphrase();
-    const createResult = await this.walletProcess?.createWalletAndGetSeed(passphrase);
-    if (!createResult || !createResult.success || !createResult.seed) {
-      throw new Error(
-        `Failed to create wallet${createResult && 'error' in createResult ? `: ${createResult.error}` : ''}`
-      );
-    }
+      const passphrase = appLock.generateWalletPassphrase();
+      const createResult = await this.walletProcess?.createWalletAndGetSeed(passphrase);
+      if (!createResult || !createResult.success || !createResult.seed) {
+        throw new Error(
+          `Failed to create wallet${createResult && 'error' in createResult ? `: ${createResult.error}` : ''}`
+        );
+      }
 
-    appLock.storeWalletPassphrase(name, passphrase);
+      appLock.storeWalletPassphrase(name, passphrase);
 
-    const generatedSeed = createResult.seed;
+      const generatedSeed = createResult.seed;
 
-    await this.startWalletProcess();
+      await this.startWalletProcess();
 
-    this.currentWallet = { name };
+      this.currentWallet = { name };
 
-    await this.unlockFromVault(name);
+      await this.unlockFromVault(name);
 
-    return { seed: generatedSeed };
+      return { seed: generatedSeed };
+    });
   }
 
   async import(options: { name: string; seed: string; password?: string }) {
@@ -270,35 +427,40 @@ class ManagerService implements ManagerApi {
     if (!seed) {
       throw new Error('Seed phrase is required');
     }
+    if (isReservedWalletName(name)) {
+      throw new Error(`"${name}" is a reserved wallet name`);
+    }
     if (appLock.getStatus() !== 'unlocked') {
       throw new Error('Unlock the app before importing a wallet');
     }
 
-    await this.stopWalletProcess();
+    return this.runTransition(async () => {
+      await this.stopWalletProcess();
 
-    await this.loadWallet(name, 'create');
+      await this.loadWallet(name, 'create');
 
-    const passphrase = appLock.generateWalletPassphrase();
-    const importResult = await this.walletProcess?.importWalletFromSeed(seed, passphrase);
-    if (!importResult || !importResult.success) {
-      throw new Error(
-        `Failed to import wallet: ${importResult && 'error' in importResult ? importResult.error : 'Unknown error'}`
-      );
-    }
+      const passphrase = appLock.generateWalletPassphrase();
+      const importResult = await this.walletProcess?.importWalletFromSeed(seed, passphrase);
+      if (!importResult || !importResult.success) {
+        throw new Error(
+          `Failed to import wallet: ${importResult && 'error' in importResult ? importResult.error : 'Unknown error'}`
+        );
+      }
 
-    appLock.storeWalletPassphrase(name, passphrase);
+      appLock.storeWalletPassphrase(name, passphrase);
 
-    try {
-      await this.startWalletProcess();
-    } catch (error) {
-      console.log('Failed to start wallet process:', error);
-    }
+      try {
+        await this.startWalletProcess();
+      } catch (error) {
+        console.log('Failed to start wallet process:', error);
+      }
 
-    this.currentWallet = { name };
+      this.currentWallet = { name };
 
-    await this.unlockFromVault(name);
+      await this.unlockFromVault(name);
 
-    return { name, seed };
+      return { name, seed };
+    });
   }
 
   async getExistingWallets() {
@@ -308,7 +470,7 @@ class ManagerService implements ManagerApi {
     if (fs.existsSync(baseWalletDir)) {
       const entries = await fs.promises.readdir(baseWalletDir, { withFileTypes: true });
       walletNames = entries
-        .filter(entry => entry.isDirectory())
+        .filter(entry => entry.isDirectory() && entry.name !== CHAIN_HOST_NAME)
         .map(entry => fsToDisplay(entry.name))
         .filter(name => {
           const walletDbPath = path.join(baseWalletDir, name, networkConfig.dataSubdir, 'wallet.db');

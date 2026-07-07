@@ -113,14 +113,18 @@ interface ContactsApi {
   remove: (id: string) => Promise<void>;
 }
 
-// Which backend served a hardware wallet balance read: the local Oyster
-// wallet, or the external indexer used in hardware-only mode.
-type HardwareBalanceSource = 'oyster' | 'indexer';
+// Hardware reads are always served by a local wallet (the running user
+// wallet or the hidden chain host). The field survives for wire-shape
+// stability.
+type HardwareBalanceSource = 'oyster';
 
 interface HardwareWalletBalance {
   info: BlockbookAddressInfo;
   utxos: BlockbookUtxo[];
   source: HardwareBalanceSource;
+  // The backing wallet is still syncing headers/blocks; balances and history
+  // may be incomplete until it finishes.
+  walletSyncing: boolean;
 }
 
 interface HardwareWalletAccountRequest {
@@ -154,6 +158,7 @@ interface HardwareWalletTransactionsResult {
   transactions: Transaction[];
   hasMore: boolean;
   source: HardwareBalanceSource;
+  walletSyncing: boolean;
 }
 
 interface HardwareWalletApi {

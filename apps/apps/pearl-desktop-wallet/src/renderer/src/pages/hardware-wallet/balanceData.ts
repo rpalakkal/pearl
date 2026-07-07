@@ -8,4 +8,5 @@ export interface HardwareWalletBalanceData {
   info: BlockbookAddressInfo;
   utxos: BlockbookUtxo[];
   source: HardwareBalanceSource;
+  walletSyncing: boolean;
 }

@@ -53,7 +53,9 @@ export interface HardwareWalletBalanceModel {
   // peers for compact filters, not frozen.
   backfillStalled: boolean;
   balanceError: string | null;
-  balanceSource: 'oyster' | 'indexer' | null;
+  balanceSource: 'oyster' | null;
+  // The local wallet backing the reads is still syncing the chain.
+  walletSyncing: boolean;
   canBackfill: boolean;
   hardwareAddress: HardwareWalletAddress;
   hasPendingDeviceOperation: boolean;

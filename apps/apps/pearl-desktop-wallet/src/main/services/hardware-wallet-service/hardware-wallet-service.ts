@@ -9,7 +9,6 @@ import {
   type BlockbookAddressInfo,
   type BlockbookUtxo,
 } from '../../clients/blockbook-normalizers.ts';
-import {BlockbookClient} from '../../clients/blockbook-client.ts';
 import {recordSend} from '../../config/send-history.ts';
 import type {WalletService} from '../wallet-service/wallet-service.ts';
 import type {ListUnspentResult} from '../wallet-service/wallet-rpc-methods.ts';
@@ -112,95 +111,72 @@ function buildAddressInfo(address: string, utxos: BlockbookUtxo[]): BlockbookAdd
   };
 }
 
+// Whether the wallet backing hardware reads is still syncing headers/blocks.
+// Threaded to the renderer so a fresh chain host shows "syncing" instead of
+// a misleading zero balance / empty history.
+async function isWalletSyncing(walletService: WalletService): Promise<boolean> {
+  try {
+    const progress = await walletService.getSyncProgress();
+    return !progress.synced;
+  } catch {
+    return false;
+  }
+}
+
 // Reads hardware account state through the local Oyster wallet. The public
-// key import requests a rescan so UTXOs received before the key was first
-// imported are discovered; repeat imports are idempotent and skip the rescan.
-async function getLocalHardwareWalletBalance(
-  account: NormalizedHardwareAccount,
+// key import requests a rescan (now a fast batched backfill) so UTXOs
+// received before the key was first imported are discovered; repeat imports
+// are idempotent and skip the rescan.
+async function getHardwareWalletBalance(
+  request: HardwareWalletAccountRequest,
   walletService: WalletService
 ): Promise<HardwareWalletBalance> {
+  const account = normalizeHardwareAccount(request);
+
   await walletService.importPublicKey(account.publicKey, true);
-  const localUtxos = await walletService.listUnspent(0);
+  const [localUtxos, walletSyncing] = await Promise.all([
+    walletService.listUnspent(0),
+    isWalletSyncing(walletService),
+  ]);
   const utxos = localUtxos
     .filter(utxo => utxo.address === account.address)
     .map(normalizeOysterUtxo);
   const info = buildAddressInfo(account.address, utxos);
-  return {info, utxos, source: 'oyster'};
-}
-
-// Hardware-only mode: no software wallet is loaded, so read balance and UTXOs
-// from the external indexer instead of local Oyster.
-async function getIndexerHardwareWalletBalance(
-  account: NormalizedHardwareAccount
-): Promise<HardwareWalletBalance> {
-  const [info, utxos] = await Promise.all([
-    BlockbookClient.getAddressInfo(account.address, account.network),
-    BlockbookClient.getUtxos(account.address, account.network),
-  ]);
-  return {info, utxos, source: 'indexer'};
-}
-
-async function getHardwareWalletBalance(
-  request: HardwareWalletAccountRequest,
-  walletService: WalletService | null
-): Promise<HardwareWalletBalance> {
-  const account = normalizeHardwareAccount(request);
-
-  if (walletService) {
-    return getLocalHardwareWalletBalance(account, walletService);
-  }
-
-  return getIndexerHardwareWalletBalance(account);
+  return {info, utxos, source: 'oyster', walletSyncing};
 }
 
 export const HardwareWalletService = {
   async getBalance(
     request: HardwareWalletAccountRequest,
-    walletService: WalletService | null
+    walletService: WalletService
   ): Promise<HardwareWalletBalance> {
     return getHardwareWalletBalance(request, walletService);
   },
 
-  // Transaction history for a hardware address. Prefers the local Oyster view
-  // (watch-only entries after import + rescan); falls back to the external
-  // indexer when no wallet is running or the local view has nothing yet
-  // (e.g. a rescan still in flight).
+  // Transaction history for a hardware address, from the local wallet's view
+  // (watch-only entries appear after import + backfill).
   async getTransactions(
     request: HardwareWalletTransactionsRequest,
-    walletService: WalletService | null
+    walletService: WalletService
   ): Promise<HardwareWalletTransactionsResult> {
     const account = normalizeHardwareAccount(request);
     const page = Math.max(1, request.page ?? 1);
     const pageSize = Math.max(1, Math.min(100, request.pageSize ?? 25));
 
-    if (walletService) {
-      try {
-        await walletService.importPublicKey(account.publicKey, true);
-        const all = await walletService.listAllTransactions();
-        const matching = all.filter(
-          (tx: {address?: string}) => tx.address === account.address
-        );
+    await walletService.importPublicKey(account.publicKey, true);
+    const [all, walletSyncing] = await Promise.all([
+      walletService.listAllTransactions(),
+      isWalletSyncing(walletService),
+    ]);
+    const matching = all.filter((tx: {address?: string}) => tx.address === account.address);
 
-        if (matching.length > 0) {
-          const start = (page - 1) * pageSize;
-          return {
-            transactions: matching.slice(start, start + pageSize),
-            hasMore: start + pageSize < matching.length,
-            source: 'oyster',
-          };
-        }
-      } catch (error) {
-        console.error('Local hardware transaction lookup failed:', error);
-      }
-    }
-
-    const history = await BlockbookClient.getAddressTransactions(
-      account.address,
-      account.network,
-      page,
-      pageSize
-    );
-    return {...history, source: 'indexer'};
+    const start = (page - 1) * pageSize;
+    return {
+      transactions: matching.slice(start, start + pageSize),
+      hasMore: start + pageSize < matching.length,
+      source: 'oyster',
+      walletSyncing,
+    };
   },
 
   async broadcastTransaction(
@@ -212,7 +188,7 @@ export const HardwareWalletService = {
       recipientAddress,
       amountSats,
     }: HardwareWalletBroadcastRequest,
-    walletService: WalletService | null
+    walletService: WalletService
   ): Promise<HardwareWalletBroadcastResult> {
     const account = normalizeHardwareAccount({
       address: sourceAddress,
@@ -220,14 +196,9 @@ export const HardwareWalletService = {
       network,
     });
     const normalizedTransaction = normalizeRawTransactionHex(rawTransactionHex);
-    let rawTxid: string;
 
-    if (walletService) {
-      await walletService.importPublicKey(account.publicKey, true);
-      rawTxid = await walletService.sendRawTransaction(normalizedTransaction);
-    } else {
-      rawTxid = await BlockbookClient.sendTransaction(normalizedTransaction, account.network);
-    }
+    await walletService.importPublicKey(account.publicKey, true);
+    const rawTxid = await walletService.sendRawTransaction(normalizedTransaction);
 
     const txid = normalizeBlockbookTxid(rawTxid, 'broadcast transaction id');
 

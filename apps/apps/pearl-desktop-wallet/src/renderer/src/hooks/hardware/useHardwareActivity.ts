@@ -8,8 +8,8 @@ import type {Transaction} from '../../../../types/transaction.ts';
 const PAGE_SIZE = 10;
 
 /**
- * Transaction history for a hardware account: local Oyster view when a
- * wallet process runs, external indexer otherwise. Fails soft — an error
+ * Transaction history for a hardware account, served by the local wallet
+ * (the running user wallet or the hidden chain host). Fails soft — an error
  * yields an "unavailable" message, never a crash.
  */
 export function useHardwareActivity(account: HardwareWalletAddress | null) {
@@ -21,6 +21,7 @@ export function useHardwareActivity(account: HardwareWalletAddress | null) {
   const [loading, setLoading] = useState(false);
   const [hasMore, setHasMore] = useState(false);
   const [source, setSource] = useState<HardwareBalanceSource | null>(null);
+  const [walletSyncing, setWalletSyncing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const pageRef = useRef(1);
 
@@ -47,6 +48,7 @@ export function useHardwareActivity(account: HardwareWalletAddress | null) {
       setActivities(prev => (page === 1 ? result.transactions : [...prev, ...result.transactions]));
       setHasMore(result.hasMore);
       setSource(result.source);
+      setWalletSyncing(result.walletSyncing);
       setError(null);
     } catch (err) {
       if (requestKeyRef.current !== key) {
@@ -66,6 +68,7 @@ export function useHardwareActivity(account: HardwareWalletAddress | null) {
     setActivities([]);
     setHasMore(false);
     setSource(null);
+    setWalletSyncing(false);
     setError(null);
     pageRef.current = 1;
     if (account) {
@@ -79,6 +82,7 @@ export function useHardwareActivity(account: HardwareWalletAddress | null) {
     loading,
     hasMore,
     source,
+    walletSyncing,
     error,
     loadMore: () => {
       pageRef.current += 1;

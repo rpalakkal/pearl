@@ -27,11 +27,7 @@ export function HardwareBalancePanel({
       <div className="mb-3 flex items-center justify-between gap-3">
         <div>
           <div className="text-sm font-medium text-gray-700">Hardware Balance</div>
-          <div className="text-xs text-gray-500">
-            {model.balanceSource === 'indexer'
-              ? 'Read from network indexer (no local wallet running)'
-              : 'Read from local Oyster'}
-          </div>
+          <div className="text-xs text-gray-500">Read from local Oyster</div>
         </div>
         <button
           type="button"
@@ -44,6 +40,15 @@ export function HardwareBalancePanel({
           />
         </button>
       </div>
+
+      {model.walletSyncing && !model.balanceError && (
+        <div className="mb-3 flex items-center gap-1.5 rounded-md border border-blue-200 bg-blue-50 p-2 text-xs text-blue-900">
+          <Loader2 className="h-3 w-3 flex-shrink-0 animate-spin" />
+          <span>
+            The local chain host is syncing — balances may be incomplete until it finishes.
+          </span>
+        </div>
+      )}
 
       {model.balanceError ? (
         <div className="text-sm text-red-700">{model.balanceError}</div>
