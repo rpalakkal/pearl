@@ -14,6 +14,8 @@ import SendButton from './SendButton';
 import { SendConfirmDialog, type SendConfirmState } from './SendConfirmDialog';
 import { formatTxid } from '@/lib/crypto';
 import { getErrorMessage } from '@/lib/utils';
+import { maxSpendableSoftwareSats, spendableUtxoSats } from '../../lib/softwareSendEstimate';
+import { satsToPearlInput } from '../../lib/sendGate';
 
 type FeeLevel = 'fast' | 'medium' | 'slow';
 const MEMPOOL_MIN_FEE_PER_VBYTE = 0.00001;
@@ -36,10 +38,26 @@ export default function SendTransaction() {
     slow: 0.00001,
   });
   const [isLoadingFees, setIsLoadingFees] = useState(false);
+  const [utxoSats, setUtxoSats] = useState<bigint[] | null>(null);
 
   const currentFee = estimatedFees[feeLevel];
-  const WALLET_FEE_BUFFER = currentFee;
-  const spendableAmount = Math.max(0, (availableBalance ?? 0) - WALLET_FEE_BUFFER);
+  // Spendable = confirmed UTXOs minus an estimated fee for spending all of
+  // them. Falls back to deducting the raw fee rate (a rough over-estimate for
+  // small sends) only when the UTXO set can't be fetched.
+  const spendableAmount =
+    utxoSats !== null
+      ? parseFloat(satsToPearlInput(maxSpendableSoftwareSats(utxoSats, currentFee)))
+      : Math.max(0, (availableBalance ?? 0) - currentFee);
+
+  async function refreshUtxos() {
+    try {
+      const utxos = await window.appBridge.wallet.listUnspent(1);
+      setUtxoSats(spendableUtxoSats(utxos));
+    } catch (err) {
+      console.error('Failed to list unspent outputs:', err);
+      setUtxoSats(null);
+    }
+  }
 
   const form = useForm({
     defaultValues: {
@@ -72,6 +90,7 @@ export default function SendTransaction() {
       );
       setTxid(txId);
       syncWalletData();
+      void refreshUtxos();
       setSuccess('Transaction sent successfully!');
       setConfirmState(null);
       form.reset();
@@ -149,6 +168,8 @@ export default function SendTransaction() {
 
   useEffect(() => {
     fetchEstimatedFees();
+    void refreshUtxos();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Update amount when fee changes if MAX was selected

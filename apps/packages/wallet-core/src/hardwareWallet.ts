@@ -27,6 +27,8 @@ import type {
 export {
   DEFAULT_HARDWARE_WALLET_ADDRESS_INDEX,
   MAX_HARDWARE_WALLET_ADDRESS_INDEX,
+  SATS_PER_PEARL,
+  TAPROOT_DUST_SATS,
 } from './hardware-wallet/constants.ts';
 export {preloadHardwareWalletSupport} from './hardware-wallet/browser.ts';
 export {parsePearlAmountToSats, formatSatsAsPearl} from './hardware-wallet/amounts.ts';

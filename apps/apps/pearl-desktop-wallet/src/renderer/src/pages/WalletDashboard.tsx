@@ -17,6 +17,7 @@ export default function WalletDashboard() {
   const {
     walletName,
     balance,
+    unconfirmedBalance,
     activitiesPreview,
     headerHeight,
     filterHeaderHeight,
@@ -96,6 +97,15 @@ export default function WalletDashboard() {
               </div>
             ) : (
               <Loader2 className="mx-auto h-6 w-6 animate-spin text-gray-900 sm:h-8 sm:w-8" />
+            )}
+
+            {typeof unconfirmedBalance === 'number' && unconfirmedBalance > 0 && (
+              <div className="text-sm text-amber-600">
+                Pending: {formatPearlAmount(unconfirmedBalance)} PRL
+                <span className="block text-xs text-gray-500">
+                  included in total, not yet spendable
+                </span>
+              </div>
             )}
 
             {!isBlockchainSynced && bestPeerHeight > 0 && (

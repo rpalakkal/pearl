@@ -56,10 +56,11 @@ export const useWalletStore = create<WalletState>()((set, get) => ({
 
     try {
       set({ isSyncing: true });
+      // minconf=0 counts unconfirmed outputs (total); minconf=1 is spendable.
       const [walletsStats, totalBalance, availableBalance, transactions] = await Promise.all([
         window.appBridge.manager.getWalletsStats(),
         window.appBridge.wallet.getBalance('default', 0),
-        window.appBridge.wallet.getBalance('default', 0),
+        window.appBridge.wallet.getBalance('default', 1),
         window.appBridge.wallet.listTransactions(3, 0),
       ]);
       set({ activitiesPreview: transactions });

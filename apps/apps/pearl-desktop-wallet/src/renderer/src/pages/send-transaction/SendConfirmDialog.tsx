@@ -41,9 +41,11 @@ export function SendConfirmDialog({
 }) {
   const {resolveAddress} = useAddressBook();
   const [historyState, setHistoryState] = useState<HistoryState>({phase: 'loading'});
+  const [retryNonce, setRetryNonce] = useState(0);
 
   useEffect(() => {
     let cancelled = false;
+    setHistoryState({phase: 'loading'});
 
     (async () => {
       let status: RecipientSendStatus | null = null;
@@ -66,13 +68,14 @@ export function SendConfirmDialog({
     return () => {
       cancelled = true;
     };
-  }, [confirm.address]);
+  }, [confirm.address, retryNonce]);
 
   const known = resolveAddress(confirm.address);
 
-  // Fail closed: while history is loading (or when the amount is not cleanly
-  // parseable) the gate cannot pass judgment, so confirming stays disabled.
+  // Fail closed: while history is loading, or when the gate can't be
+  // evaluated (unparseable amount), confirming stays disabled.
   let gate: SendGateDecision | null = null;
+  let gateUnavailable = false;
   if (historyState.phase === 'ready') {
     try {
       gate = evaluateSendGate({
@@ -81,7 +84,7 @@ export function SendConfirmDialog({
         recipient: {hasConfirmedSend: historyState.status?.hasConfirmedSend ?? false},
       });
     } catch {
-      gate = {blocked: false, isLargeSend: false};
+      gateUnavailable = true;
     }
   }
 
@@ -149,17 +152,36 @@ export function SendConfirmDialog({
             </div>
           )}
           {historyState.phase === 'ready' &&
-            (historyState.status?.hasConfirmedSend ? (
+            (historyState.status === null ? (
+              <div className="flex items-center gap-2 text-xs text-amber-700">
+                <span>Send history unavailable — treated as a first send.</span>
+                <button
+                  type="button"
+                  onClick={() => setRetryNonce(nonce => nonce + 1)}
+                  disabled={isSending}
+                  className="rounded border border-amber-300 bg-white px-1.5 py-0.5 text-amber-800 transition-colors hover:bg-amber-100 disabled:opacity-50"
+                >
+                  Retry
+                </button>
+              </div>
+            ) : historyState.status.hasConfirmedSend ? (
               <div className="text-xs text-gray-500">
                 You have sent to this address before (confirmed).
               </div>
-            ) : historyState.status?.hasAnySend ? (
+            ) : historyState.status.hasAnySend ? (
               <div className="text-xs text-gray-500">
                 A previous send to this address is still unconfirmed.
               </div>
             ) : (
               <div className="text-xs text-amber-700">First send to this address.</div>
             ))}
+
+          {gateUnavailable && (
+            <div className="rounded-lg border border-red-200 bg-red-50 p-3 text-xs text-red-800">
+              Safety check unavailable — this send can't be verified right now. Cancel and
+              re-enter the amount.
+            </div>
+          )}
 
           {gate?.blocked && (
             <div className="space-y-2 rounded-lg border border-red-200 bg-red-50 p-3 text-xs text-red-800">

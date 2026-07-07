@@ -2,7 +2,7 @@ import {ArrowLeft, ArrowUpRight, ArrowDownLeft, ExternalLink} from 'lucide-react
 import {Transaction} from '../../../types/transaction';
 import {usePagination} from '../hooks/usePagination';
 import {useHardwareActivity} from '../hooks/hardware/useHardwareActivity';
-import {useActiveAccount} from '../store/accountsStore';
+import {useAccountsStore, useActiveAccount} from '../store/accountsStore';
 import {Button} from '@/components/ui/button';
 import {CopyButton} from '@/components/ui/copy-button';
 import {explorerTxUrl} from '../lib/explorer';
@@ -41,6 +41,7 @@ const truncateTxId = (txid: string): string => {
 
 export default function ActivityPage({onBack}: ActivityPageProps) {
   const active = useActiveAccount();
+  const network = useAccountsStore(state => state.network);
   const isHardware = active?.kind === 'hardware';
   const software = usePagination({pageSize: 25, enabled: !isHardware, resetKey: active?.id ?? null});
   const hardware = useHardwareActivity(isHardware ? active : null);
@@ -138,7 +139,9 @@ export default function ActivityPage({onBack}: ActivityPageProps) {
                         />
                         <button
                           onClick={() =>
-                            window.appBridge.window.openExternal(explorerTxUrl(activity.txid))
+                            window.appBridge.window.openExternal(
+                              explorerTxUrl(activity.txid, network)
+                            )
                           }
                           className="rounded p-1 transition-colors hover:bg-gray-100"
                           title="View on prlscan.com"

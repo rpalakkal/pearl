@@ -45,8 +45,8 @@ export default function AmountInput({
         </div>
       )}
       <div className="text-xs text-neutral-500">
-        Spendable: {formatPearlAmount(spendableAmount ?? 0)} PRL (after{' '}
-        {formatPearlAmount(currentFee)} PRL / kb fee reduction)
+        Spendable: {formatPearlAmount(spendableAmount ?? 0)} PRL (max, after estimated network
+        fee at {formatPearlAmount(currentFee)} PRL/kB)
       </div>
       <div className="mt-3 grid grid-cols-4 gap-2">
         <button
