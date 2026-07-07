@@ -3,12 +3,10 @@ import { ArrowLeft, Key, Eye, EyeOff, AlertCircle, CheckCircle2 } from 'lucide-r
 import { useNavigate } from 'react-router-dom';
 import PasswordStrength from './create-wallet/PasswordStrength';
 import { getErrorMessage } from '../lib/utils';
-import { useAppLockGuard } from '../hooks/useAppLockGuard';
 
 // Changes the app-wide password (re-encrypts the vault). Individual wallet
 // passphrases are managed by the vault and are not user-facing anymore.
 export default function ChangePassword() {
-  useAppLockGuard();
   const navigate = useNavigate();
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');

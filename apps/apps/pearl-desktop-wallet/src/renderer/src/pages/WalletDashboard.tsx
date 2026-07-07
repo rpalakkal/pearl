@@ -4,19 +4,15 @@ import {
   CheckCircle2,
   ArrowUpRight,
   ArrowDownLeft,
-  Lock,
   Key,
   Loader2,
-  Usb,
 } from 'lucide-react';
 import {useNavigate} from 'react-router-dom';
 import {useWalletStore} from '../store/walletStore';
 import {formatPearlAmount} from '../lib/crypto';
 import {Tooltip, TooltipContent, TooltipProvider, TooltipTrigger} from '../components/ui/tooltip';
-import {useAppLockGuard} from '../hooks/useAppLockGuard';
 
 export default function WalletDashboard() {
-  useAppLockGuard();
   const navigate = useNavigate();
   const {
     walletName,
@@ -29,7 +25,6 @@ export default function WalletDashboard() {
     syncPhase,
     isBlockchainSynced,
   } = useWalletStore();
-  const {clearWalletData} = useWalletStore();
   const [copiedAddress, setCopiedAddress] = useState<string | null>(null);
   const [walletAddress] = useState<string>('');
 
@@ -40,26 +35,6 @@ export default function WalletDashboard() {
       setTimeout(() => setCopiedAddress(null), 2000);
     } catch (err) {
       console.error('Failed to copy to clipboard:', err);
-    }
-  };
-
-  const handleLockWallet = async () => {
-    clearWalletData();
-
-    try {
-      // App-wide lock: stops the wallet process AND drops the vault key from
-      // main memory. During birthday recovery the polite `walletlock` RPC can
-      // hang for up to a minute, so use the force (SIGKILL) path — bbolt
-      // commits are atomic at txn boundaries, a mid-batch kill just replays.
-      await window.appBridge.appLock.lock({force: syncPhase === 'blocks'});
-      console.log('✅ App locked successfully');
-    } catch (err) {
-      console.error('❌ Exception during app lock:', err);
-    } finally {
-      // Always navigate — the Go process is either dead or actively dying.
-      // Leaving the user on a blank dashboard would be worse than showing the
-      // unlock screen while cleanup finishes in the background.
-      navigate('/unlock');
     }
   };
 
@@ -188,18 +163,6 @@ export default function WalletDashboard() {
                     label="Password"
                     disabled={actionsBlocked}
                     disabledTooltip={blockedTooltip}
-                  />
-
-                  <ActionTile
-                    onClick={() => navigate('/hardware-wallet')}
-                    icon={<Usb className="h-4 w-4 text-white sm:h-5 sm:w-5" />}
-                    label="Hardware"
-                  />
-
-                  <ActionTile
-                    onClick={handleLockWallet}
-                    icon={<Lock className="h-4 w-4 text-white sm:h-5 sm:w-5" />}
-                    label="Lock"
                   />
                 </div>
               </TooltipProvider>

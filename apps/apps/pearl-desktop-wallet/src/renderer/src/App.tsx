@@ -10,6 +10,7 @@ import AppLockScreen from './pages/app-lock/AppLockScreen';
 import AppLockSetup from './pages/app-lock/AppLockSetup';
 import ChangePassword from './pages/ChangePassword';
 import HardwareWallet from './pages/HardwareWallet';
+import AppShell from './components/app-shell/AppShell';
 import {useNavigate} from 'react-router-dom';
 import {SyncWallet} from './SyncWallet';
 import {MajorUpgradeBanner} from './components/MajorUpgradeBanner';
@@ -24,17 +25,24 @@ function AppContent() {
       <MajorUpgradeBanner />
       <div className={`min-h-0 flex-1`}>
         <Routes>
+          {/* Outside the app lock shell: boot, lock screens, onboarding */}
           <Route path="/" element={<WelcomePage />} />
-          <Route path="/wallet" element={<WalletDashboard />} />
-          <Route path="/send" element={<SendTransaction />} />
-          <Route path="/receive" element={<ReceiveTransaction />} />
-          <Route path="/hardware-wallet" element={<HardwareWallet />} />
           <Route path="/unlock" element={<AppLockScreen />} />
           <Route path="/setup" element={<AppLockSetup />} />
-          <Route path="/change-password" element={<ChangePassword />} />
           <Route path="/import-account" element={<ImportAccount />} />
           <Route path="/onboarding/create" element={<CreateWallet />} />
-          <Route path="/activity" element={<ActivityPage onBack={() => navigate('/wallet')} />} />
+
+          {/* Everything behind the lock shares the shell (account switcher,
+              network selector, lock) */}
+          <Route element={<AppShell />}>
+            <Route path="/wallet" element={<WalletDashboard />} />
+            <Route path="/send" element={<SendTransaction />} />
+            <Route path="/receive" element={<ReceiveTransaction />} />
+            <Route path="/hardware-wallet" element={<HardwareWallet />} />
+            <Route path="/change-password" element={<ChangePassword />} />
+            <Route path="/activity" element={<ActivityPage onBack={() => navigate('/wallet')} />} />
+          </Route>
+
           <Route
             path="*"
             element={

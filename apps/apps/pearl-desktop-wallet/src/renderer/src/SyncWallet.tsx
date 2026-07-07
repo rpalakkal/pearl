@@ -2,14 +2,18 @@ import { useEffect, useRef } from 'react';
 import { useLocation } from 'react-router-dom';
 import { useWalletStore } from './store/walletStore';
 
-const UNLOCKED_ROUTES = ['/wallet', '/send', '/receive', '/activity', '/change-password'];
+// Routes outside the app lock where no wallet polling should run. Everything
+// else (including the hardware page) polls while a software wallet process is
+// running — it keeps serving local reads even when a hardware account is the
+// active one.
+const LOCKED_ROUTES = ['/', '/unlock', '/setup', '/import-account', '/onboarding/create'];
 
 function SyncWallet() {
   const { syncWalletData, updateSyncProgress, isBlockchainSynced } = useWalletStore();
   const { pathname } = useLocation();
   const dataIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const syncIntervalRef = useRef<NodeJS.Timeout | null>(null);
-  const isUnlocked = UNLOCKED_ROUTES.includes(pathname);
+  const isUnlocked = !LOCKED_ROUTES.includes(pathname);
 
   useEffect(() => {
     if (!isUnlocked) {
