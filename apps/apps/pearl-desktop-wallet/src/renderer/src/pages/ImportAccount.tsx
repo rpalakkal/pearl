@@ -7,6 +7,10 @@ import { Link, useNavigate } from 'react-router-dom';
 import { useWalletStore } from '../store/walletStore';
 import { getErrorMessage } from '../lib/utils';
 import { parseSeedInput } from '../lib/seed-input';
+import {
+  validateWalletNameAvailable,
+  validateWalletNameFormat,
+} from '../lib/walletNameValidation';
 import { useAppLockGuard } from '../hooks/useAppLockGuard';
 
 // The wallet passphrase is generated and vaulted behind the app password, so
@@ -17,65 +21,45 @@ export default function ImportAccount() {
   const [walletName, setWalletName] = useState('');
   const [isImporting, setIsImporting] = useState(false);
   const [error, setError] = useState('');
-  const [existingWallets, setExistingWallets] = useState<string[]>([]);
   const [isCheckingWalletName, setIsCheckingWalletName] = useState(false);
   const [walletNameError, setWalletNameError] = useState<string | null>(null);
   const navigate = useNavigate();
   const { clearWalletData } = useWalletStore();
 
+  // Debounced live check: format plus a fresh availability lookup, so a
+  // wallet created elsewhere after this page mounted is still caught.
   useEffect(() => {
-    const fetchExistingWallets = async () => {
-      try {
-        const result = await window.appBridge.manager.getExistingWallets();
-        setExistingWallets(result.walletNames);
-      } catch (error) {
-        console.error('Failed to fetch existing wallets:', error);
-      }
-    };
-
-    fetchExistingWallets();
-  }, []);
-
-  useEffect(() => {
-    const validateWalletName = async () => {
-      if (!walletName.trim()) {
-        setWalletNameError(null);
-        return;
-      }
-
-      setIsCheckingWalletName(true);
+    if (!walletName.trim()) {
       setWalletNameError(null);
+      setIsCheckingWalletName(false);
+      return;
+    }
 
-      const timeoutId = setTimeout(() => {
-        if (existingWallets.map(wallet => wallet.toLowerCase()).includes(walletName.trim().toLowerCase())) {
-          setWalletNameError(
-            `A wallet named "${walletName.trim()}" already exists. Please choose a different name.`
-          );
-        } else {
-          setWalletNameError(null);
-        }
-        setIsCheckingWalletName(false);
-      }, 300);
+    setIsCheckingWalletName(true);
+    setWalletNameError(null);
 
-      return () => clearTimeout(timeoutId);
-    };
+    const timeoutId = setTimeout(async () => {
+      const formatError = validateWalletNameFormat(walletName);
+      const availabilityError = formatError
+        ? null
+        : await validateWalletNameAvailable(walletName).catch(() => null);
+      setWalletNameError(formatError ?? availabilityError);
+      setIsCheckingWalletName(false);
+    }, 300);
 
-    validateWalletName();
-  }, [walletName, existingWallets]);
+    return () => clearTimeout(timeoutId);
+  }, [walletName]);
 
   const handleImport = async () => {
-    if (!walletName.trim()) {
-      setError('Please enter a wallet name');
+    // Re-validate at submit time; the debounced state can be stale.
+    const formatError = validateWalletNameFormat(walletName);
+    if (formatError) {
+      setError(formatError);
       return;
     }
-
-    if (walletNameError) {
-      setError(walletNameError);
-      return;
-    }
-
-    if (isCheckingWalletName) {
-      setError('Please wait while we check the wallet name...');
+    const availabilityError = await validateWalletNameAvailable(walletName).catch(() => null);
+    if (availabilityError) {
+      setError(availabilityError);
       return;
     }
 

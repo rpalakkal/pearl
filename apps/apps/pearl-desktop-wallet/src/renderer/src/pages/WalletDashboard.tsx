@@ -6,6 +6,7 @@ import {
   ArrowDownLeft,
   Key,
   Loader2,
+  Settings2,
 } from 'lucide-react';
 import {useNavigate} from 'react-router-dom';
 import {useWalletStore} from '../store/walletStore';
@@ -173,6 +174,13 @@ export default function WalletDashboard() {
                     label="Password"
                     disabled={actionsBlocked}
                     disabledTooltip={blockedTooltip}
+                  />
+
+                  {/* Details are read-only; never sync-gated. */}
+                  <ActionTile
+                    onClick={() => navigate('/account')}
+                    icon={<Settings2 className="h-4 w-4 text-white sm:h-5 sm:w-5" />}
+                    label="Details"
                   />
                 </div>
               </TooltipProvider>

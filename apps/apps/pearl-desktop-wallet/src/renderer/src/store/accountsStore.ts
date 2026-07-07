@@ -13,6 +13,9 @@ import {getErrorMessage} from '../lib/utils';
 
 interface AccountsState {
   accounts: WalletAccount[];
+  // False until the first refreshAccounts completes, so empty-state UI can
+  // tell "not enumerated yet" from "genuinely no accounts".
+  accountsLoaded: boolean;
   activeAccountId: string | null;
   network: PearlNetwork;
   switchState: 'idle' | 'starting-wallet';
@@ -22,12 +25,14 @@ interface AccountsState {
   refreshAccounts: () => Promise<WalletAccount[]>;
   setActiveAccount: (id: string) => Promise<void>;
   activateInitialAccount: () => Promise<WalletAccount | null>;
+  clearActiveAccount: () => void;
   clearMigration: () => void;
   clearSwitchError: () => void;
 }
 
 export const useAccountsStore = create<AccountsState>()((set, get) => ({
   accounts: [],
+  accountsLoaded: false,
   activeAccountId: null,
   network: 'mainnet',
   switchState: 'idle',
@@ -51,7 +56,7 @@ export const useAccountsStore = create<AccountsState>()((set, get) => ({
     }
 
     const accounts = buildAccountList(walletNames, enumerateHardwareAccounts(network));
-    set({accounts, network});
+    set({accounts, network, accountsLoaded: true});
     return accounts;
   },
 
@@ -120,6 +125,10 @@ export const useAccountsStore = create<AccountsState>()((set, get) => ({
     } finally {
       set({switchState: 'idle'});
     }
+  },
+
+  clearActiveAccount() {
+    set({activeAccountId: null});
   },
 
   clearMigration() {

@@ -405,6 +405,9 @@ class ManagerService implements ManagerApi {
       }
 
       appLock.storeWalletPassphrase(name, passphrase);
+      // Vault the mnemonic so the account page can reveal it later
+      // (password-gated); it otherwise exists only on the seed-display step.
+      appLock.storeWalletMnemonic(name, createResult.seed);
 
       const generatedSeed = createResult.seed;
 
@@ -448,6 +451,7 @@ class ManagerService implements ManagerApi {
       }
 
       appLock.storeWalletPassphrase(name, passphrase);
+      appLock.storeWalletMnemonic(name, seed);
 
       try {
         await this.startWalletProcess();
@@ -460,6 +464,96 @@ class ManagerService implements ManagerApi {
       await this.unlockFromVault(name);
 
       return { name, seed };
+    });
+  }
+
+  // Renames a wallet: its data directory, its vault entries, and (when it is
+  // the running wallet) stops the process so the renderer re-selects it under
+  // the new name. Chain state moves with the directory.
+  async renameWallet(oldName: string, newName: string): Promise<{ name: string }> {
+    const trimmedNewName = newName?.trim();
+    if (!trimmedNewName) {
+      throw new Error('Wallet name is required');
+    }
+    if (isReservedWalletName(trimmedNewName)) {
+      throw new Error(`"${trimmedNewName}" is a reserved wallet name`);
+    }
+    if (appLock.getStatus() !== 'unlocked') {
+      throw new Error('Unlock the app before renaming a wallet');
+    }
+
+    const existing = await this.getExistingWallets();
+    if (!existing.walletNames.includes(oldName)) {
+      throw new Error(`Wallet "${oldName}" was not found`);
+    }
+    const collides = existing.walletNames.some(
+      name => name !== oldName && name.toLowerCase() === trimmedNewName.toLowerCase()
+    );
+    if (collides) {
+      throw new Error('A wallet with this name already exists');
+    }
+
+    return this.runTransition(async () => {
+      const wasActive = this.currentWallet?.name === oldName;
+      if (wasActive) {
+        await this.stopWalletProcess();
+        this.currentWallet = null;
+      }
+
+      fs.renameSync(
+        path.join(baseWalletDir, displayToFs(oldName)),
+        path.join(baseWalletDir, displayToFs(trimmedNewName))
+      );
+
+      // Vault entries may be keyed by display or fs form (historic quirk).
+      for (const key of new Set([oldName, displayToFs(oldName)])) {
+        appLock.renameWalletEntries(key, trimmedNewName);
+      }
+
+      return { name: trimmedNewName };
+    });
+  }
+
+  // Deletes a wallet's local data and vault entries. Password-gated: without
+  // the vaulted (random) passphrase the wallet.db is unusable anyway, so the
+  // recovery phrase is the only way back.
+  async deleteWallet(name: string, password: string): Promise<void> {
+    if (isReservedWalletName(name)) {
+      throw new Error(`"${name}" is a reserved wallet name`);
+    }
+    if (appLock.getStatus() !== 'unlocked') {
+      throw new Error('Unlock the app before removing a wallet');
+    }
+    await appLock.verifyPassword(password);
+
+    return this.runTransition(async () => {
+      if (this.currentWallet?.name === name) {
+        await this.stopWalletProcess({ force: true });
+        this.currentWallet = null;
+      }
+
+      fs.rmSync(path.join(baseWalletDir, displayToFs(name)), { recursive: true, force: true });
+
+      for (const key of new Set([name, displayToFs(name)])) {
+        appLock.removeWalletEntries(key);
+      }
+    });
+  }
+
+  // Forgot-password escape hatch, callable while locked. Deletes the vault
+  // and all wallet data: without the vault the random per-wallet passphrases
+  // are unrecoverable, so keeping wallet.db files would only strand them.
+  // Contacts and peer/network settings are preserved.
+  async resetApp(): Promise<void> {
+    return this.runTransition(async () => {
+      await this.stopWalletProcess({ force: true });
+      this.currentWallet = null;
+      try {
+        fs.rmSync(baseWalletDir, { recursive: true, force: true });
+      } catch (error) {
+        console.error('Failed to remove wallet data during reset:', error);
+      }
+      appLock.resetVault();
     });
   }
 

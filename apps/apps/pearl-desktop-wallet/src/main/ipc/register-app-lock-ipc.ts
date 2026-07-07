@@ -22,6 +22,17 @@ function registerAppLockIpc(ms: ManagerService) {
   ipcMain.handle('app-lock-has-wallet-passphrase', (_event, walletName: string) =>
     appLock.hasWalletPassphrase(walletName)
   );
+  ipcMain.handle('app-lock-has-wallet-mnemonic', (_event, walletName: string) =>
+    appLock.hasWalletMnemonic(walletName)
+  );
+  ipcMain.handle(
+    'app-lock-reveal-wallet-mnemonic',
+    (_event, walletName: string, password: string) =>
+      appLock.revealWalletMnemonic(walletName, password)
+  );
+  // Forgot-password reset: usable while locked by design — physical access to
+  // this machine already equals control of the local data being deleted.
+  ipcMain.handle('app-lock-reset', () => ms.resetApp());
   ipcMain.handle(
     'app-lock-store-wallet-passphrase',
     async (_event, walletName: string, passphrase: string) => {

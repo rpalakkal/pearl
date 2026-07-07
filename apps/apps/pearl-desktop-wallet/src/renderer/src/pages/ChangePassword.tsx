@@ -31,6 +31,13 @@ export default function ChangePassword() {
       return false;
     }
 
+    // Mirrors the backend MIN_PASSWORD_LENGTH so users learn the rule before
+    // submitting instead of from the IPC error.
+    if (newPassword.length < 8) {
+      setError('Password must be at least 8 characters');
+      return false;
+    }
+
     if (newPassword !== confirmPassword) {
       setError('New passwords do not match');
       return false;
@@ -53,18 +60,15 @@ export default function ChangePassword() {
     setError(null);
     setSuccess(null);
 
-    console.log('🔄 Changing app password...');
-
     try {
       await window.appBridge.appLock.changePassword(currentPassword, newPassword);
 
-      console.log('✅ App password changed successfully');
       setSuccess('App password changed successfully!');
       setCurrentPassword('');
       setNewPassword('');
       setConfirmPassword('');
     } catch (err) {
-      console.error('❌ Exception during password change:', err);
+      console.error('Exception during password change:', err);
       setError(getErrorMessage(err, 'An error occurred while changing the password'));
     } finally {
       setIsChanging(false);
@@ -76,7 +80,7 @@ export default function ChangePassword() {
       {/* Header */}
       <div className="flex flex-shrink-0 items-center gap-4 border-b border-gray-200 bg-white/80 p-6 shadow-sm backdrop-blur-sm">
         <button
-          onClick={() => navigate('/wallet')}
+          onClick={() => navigate(-1)}
           className="rounded-lg p-2 transition-colors hover:bg-gray-100"
         >
           <ArrowLeft className="h-5 w-5 text-gray-700" />

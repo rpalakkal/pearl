@@ -1,14 +1,26 @@
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from '@/components/ui/alert-dialog';
 import { AlertTriangle, CheckCircle, Copy, Key } from 'lucide-react';
 import { useState } from 'react';
 
 type SeedDisplayProps = {
   seed: string;
   onConfirm: () => void;
+  onSkip?: () => void;
 };
 
-export default function SeedDisplay({ seed, onConfirm }: SeedDisplayProps) {
+export default function SeedDisplay({ seed, onConfirm, onSkip }: SeedDisplayProps) {
   const [isCopied, setIsCopied] = useState(false);
 
   const handleCopySeed = async () => {
@@ -89,6 +101,30 @@ export default function SeedDisplay({ seed, onConfirm }: SeedDisplayProps) {
       >
         I've Secured My Seed
       </Button>
+
+      {onSkip && (
+        <AlertDialog>
+          <AlertDialogTrigger asChild>
+            <Button variant="ghost" className="mt-2 w-full text-sm text-gray-500">
+              Skip for now
+            </Button>
+          </AlertDialogTrigger>
+          <AlertDialogContent className="bg-white">
+            <AlertDialogHeader>
+              <AlertDialogTitle>Skip backing up your recovery phrase?</AlertDialogTitle>
+              <AlertDialogDescription>
+                Your recovery phrase is the only backup of this wallet. You can view it later in
+                Account details → Reveal recovery phrase (requires your app password) — but back
+                it up before receiving significant funds.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Back it up now</AlertDialogCancel>
+              <AlertDialogAction onClick={onSkip}>Skip for now</AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+      )}
     </div>
   );
 }

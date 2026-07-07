@@ -122,3 +122,60 @@ test('setup refuses to overwrite an existing vault', async () => {
   appLock.lock();
   await assert.rejects(appLock.setup('another password'), /already set up/);
 });
+
+test('wallet mnemonics round-trip and stay password-gated', async () => {
+  await appLock.setup('correct horse battery');
+  assert.equal(appLock.hasWalletMnemonic('main'), false);
+
+  appLock.storeWalletMnemonic('main', 'abandon ability able about above absent absorb abstract absurd abuse access accident');
+  assert.equal(appLock.hasWalletMnemonic('main'), true);
+
+  appLock.lock();
+  await appLock.unlock('correct horse battery');
+  assert.equal(appLock.hasWalletMnemonic('main'), true);
+  assert.equal(
+    await appLock.revealWalletMnemonic('main', 'correct horse battery'),
+    'abandon ability able about above absent absorb abstract absurd abuse access accident'
+  );
+  assert.equal(await appLock.revealWalletMnemonic('other', 'correct horse battery'), null);
+  await assert.rejects(appLock.revealWalletMnemonic('main', 'wrong password!'), /Incorrect password/);
+});
+
+test('legacy vaults without a mnemonics field still decrypt', async () => {
+  await appLock.setup('correct horse battery');
+  appLock.storeWalletPassphrase('legacy', 'pass');
+  // Simulate a pre-mnemonic vault by re-reading; the field is optional.
+  appLock.lock();
+  await appLock.unlock('correct horse battery');
+  assert.equal(appLock.hasWalletMnemonic('legacy'), false);
+});
+
+test('rename and remove move both passphrase and mnemonic entries', async () => {
+  await appLock.setup('correct horse battery');
+  appLock.storeWalletPassphrase('old-name', 'pass-1');
+  appLock.storeWalletMnemonic('old-name', 'seed words here');
+
+  appLock.renameWalletEntries('old-name', 'new-name');
+  assert.equal(appLock.hasWalletPassphrase('old-name'), false);
+  assert.equal(appLock.hasWalletMnemonic('old-name'), false);
+  assert.equal(appLock.getWalletPassphrase('new-name'), 'pass-1');
+  assert.equal(appLock.hasWalletMnemonic('new-name'), true);
+
+  // Renaming a wallet with no entries is a no-op, not an error.
+  appLock.renameWalletEntries('missing', 'whatever');
+
+  appLock.removeWalletEntries('new-name');
+  assert.equal(appLock.hasWalletPassphrase('new-name'), false);
+  assert.equal(appLock.hasWalletMnemonic('new-name'), false);
+});
+
+test('resetVault deletes the vault and returns to uninitialized', async () => {
+  await appLock.setup('correct horse battery');
+  appLock.storeWalletPassphrase('w', 'p');
+  assert.ok(fs.existsSync(vaultFile()));
+
+  appLock.resetVault();
+  assert.equal(appLock.getStatus(), 'uninitialized');
+  assert.equal(fs.existsSync(vaultFile()), false);
+  assert.equal(fs.existsSync(`${vaultFile()}.bak`), false);
+});

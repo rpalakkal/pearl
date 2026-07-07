@@ -3,6 +3,7 @@ import {useNavigate, useSearchParams} from 'react-router-dom';
 import {AlertCircle, CheckCircle2, Loader2, ShieldCheck, XCircle} from 'lucide-react';
 import {Button} from '@/components/ui/button';
 import {getErrorMessage} from '@/lib/utils';
+import {PasswordInput} from '../../components/PasswordInput';
 import PasswordStrength from '../create-wallet/PasswordStrength';
 
 /**
@@ -73,27 +74,23 @@ export default function AppLockSetup() {
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-2">
             <label className="text-sm font-medium text-gray-700">App Password</label>
-            <input
-              type="password"
+            <PasswordInput
               value={password}
-              onChange={e => setPassword(e.target.value)}
+              onChange={setPassword}
               placeholder="At least 8 characters"
               autoFocus
               disabled={isSubmitting}
-              className="focus:border-brand-green focus:ring-brand-green/20 w-full rounded-lg border border-gray-300 bg-white px-4 py-3 text-gray-900 placeholder-gray-400 shadow-sm focus:outline-none focus:ring-2"
             />
             <PasswordStrength password={password} />
           </div>
 
           <div className="space-y-2">
             <label className="text-sm font-medium text-gray-700">Confirm Password</label>
-            <input
-              type="password"
+            <PasswordInput
               value={confirm}
-              onChange={e => setConfirm(e.target.value)}
+              onChange={setConfirm}
               placeholder="Repeat the password"
               disabled={isSubmitting}
-              className="focus:border-brand-green focus:ring-brand-green/20 w-full rounded-lg border border-gray-300 bg-white px-4 py-3 text-gray-900 placeholder-gray-400 shadow-sm focus:outline-none focus:ring-2"
             />
             {confirm && (
               <div

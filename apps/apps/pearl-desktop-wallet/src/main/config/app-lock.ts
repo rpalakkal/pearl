@@ -38,6 +38,10 @@ const MIN_PASSWORD_LENGTH = 8;
 
 interface VaultData {
   walletPassphrases: Record<string, string>;
+  // Recovery phrases, stored at wallet create/import so they can be revealed
+  // later (password-gated). Wallets created before this field existed have no
+  // entry and can never be revealed retroactively.
+  walletMnemonics?: Record<string, string>;
   updatedAt: number;
 }
 
@@ -230,11 +234,17 @@ export function lock(): void {
   }
 }
 
+// Verifies against the file even while unlocked, so password-gated actions
+// (reveal seed, delete wallet) always re-prompt meaningfully.
+export async function verifyPassword(password: string): Promise<void> {
+  await unlock(password);
+}
+
 export async function changePassword(currentPassword: string, nextPassword: string): Promise<void> {
   assertValidPassword(nextPassword);
 
   // Always verify the current password against the file, even if unlocked.
-  await unlock(currentPassword);
+  await verifyPassword(currentPassword);
   const { data } = requireUnlocked();
 
   const salt = randomBytes(32);
@@ -265,4 +275,88 @@ export function storeWalletPassphrase(walletName: string, passphrase: string): v
 // phrase is the recovery path if the vault is ever lost.
 export function generateWalletPassphrase(): string {
   return randomBytes(32).toString('hex');
+}
+
+export function storeWalletMnemonic(walletName: string, mnemonic: string): void {
+  if (!walletName || !mnemonic) {
+    throw new Error('Wallet name and mnemonic are required');
+  }
+  const vault = requireUnlocked();
+  vault.data.walletMnemonics = {
+    ...vault.data.walletMnemonics,
+    [walletName]: mnemonic,
+  };
+  persist();
+}
+
+export function hasWalletMnemonic(walletName: string): boolean {
+  return requireUnlocked().data.walletMnemonics?.[walletName] !== undefined;
+}
+
+// Password-gated even while unlocked: revealing the seed is the most
+// sensitive read the app offers.
+export async function revealWalletMnemonic(
+  walletName: string,
+  password: string
+): Promise<string | null> {
+  await verifyPassword(password);
+  return requireUnlocked().data.walletMnemonics?.[walletName] ?? null;
+}
+
+// Moves the passphrase and mnemonic entries to a new wallet name in one
+// persisted write. Missing entries are skipped silently.
+export function renameWalletEntries(oldName: string, newName: string): void {
+  const vault = requireUnlocked();
+  let changed = false;
+
+  const passphrase = vault.data.walletPassphrases[oldName];
+  if (passphrase !== undefined) {
+    vault.data.walletPassphrases[newName] = passphrase;
+    delete vault.data.walletPassphrases[oldName];
+    changed = true;
+  }
+
+  const mnemonic = vault.data.walletMnemonics?.[oldName];
+  if (mnemonic !== undefined) {
+    vault.data.walletMnemonics![newName] = mnemonic;
+    delete vault.data.walletMnemonics![oldName];
+    changed = true;
+  }
+
+  if (changed) {
+    persist();
+  }
+}
+
+export function removeWalletEntries(walletName: string): void {
+  const vault = requireUnlocked();
+  let changed = false;
+
+  if (vault.data.walletPassphrases[walletName] !== undefined) {
+    delete vault.data.walletPassphrases[walletName];
+    changed = true;
+  }
+  if (vault.data.walletMnemonics?.[walletName] !== undefined) {
+    delete vault.data.walletMnemonics[walletName];
+    changed = true;
+  }
+
+  if (changed) {
+    persist();
+  }
+}
+
+// Full reset for the forgot-password path: locks and deletes the vault file
+// (and its backup/temp artifacts). Without the vault the random wallet
+// passphrases are gone, so callers must also delete the wallet data.
+export function resetVault(): void {
+  lock();
+  for (const suffix of ['', '.bak', '.tmp']) {
+    const target = `${vaultPath()}${suffix}`;
+    try {
+      fs.rmSync(target, { force: true });
+    } catch (error) {
+      console.warn(`Failed to remove vault artifact ${target}:`, error);
+    }
+  }
 }

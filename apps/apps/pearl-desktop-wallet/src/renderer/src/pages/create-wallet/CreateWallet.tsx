@@ -16,10 +16,12 @@ export default function CreateWallet() {
   useAppLockGuard();
   const [step, setStep] = useState<CreateWalletStep>('wallet-setup');
   const [generatedSeed, setGeneratedSeed] = useState<string>('');
+  const [createError, setCreateError] = useState<string | null>(null);
   const navigate = useNavigate();
   const { clearWalletData } = useWalletStore();
 
   async function handleWalletCreated(walletName: string) {
+    setCreateError(null);
     try {
       // Clear wallet data immediately to prevent showing old wallet data during creation
       clearWalletData();
@@ -31,7 +33,9 @@ export default function CreateWallet() {
       setStep('seed-display');
     } catch (error) {
       console.error('Failed to create wallet:', error);
-      alert(`Failed to create wallet. Please try again.\n${error}`);
+      setCreateError(
+        `Failed to create wallet: ${error instanceof Error ? error.message : String(error)}`
+      );
     }
   }
 
@@ -55,7 +59,15 @@ export default function CreateWallet() {
       case 'wallet-setup':
         return <WalletSetupStep onCreate={handleWalletCreated} onBack={() => navigate('/')} />;
       case 'seed-display':
-        return <SeedDisplay seed={generatedSeed} onConfirm={handleSeedConfirmed} />;
+        // Skipping is safe: the wallet already exists and its mnemonic is
+        // vaulted, so it stays viewable from Account details (password-gated).
+        return (
+          <SeedDisplay
+            seed={generatedSeed}
+            onConfirm={handleSeedConfirmed}
+            onSkip={() => navigate('/wallet')}
+          />
+        );
       case 'seed-verification':
         return (
           <SeedVerification
@@ -85,6 +97,12 @@ export default function CreateWallet() {
         <div className="py -4 flex min-h-full flex-col items-center sm:py-8">
           {/* Add top spacing to ensure content stays below header */}
           <div className="h-4 flex-shrink-0 sm:h-8"></div>
+
+          {createError && step === 'wallet-setup' && (
+            <div className="mb-4 w-full max-w-md rounded-lg border border-red-300 bg-red-50 p-4 text-sm text-red-700">
+              {createError}
+            </div>
+          )}
 
           <div className="flex w-full flex-1 items-center justify-center">{renderStep()}</div>
 

@@ -7,6 +7,7 @@ import {
   HardDrive,
   Loader2,
   Plus,
+  Settings2,
   Usb,
   Wallet,
 } from 'lucide-react';
@@ -52,6 +53,31 @@ export function AccountSwitcher() {
     navigate(path);
   }
 
+  function AccountDetailsShortcut() {
+    return (
+      <span
+        role="button"
+        tabIndex={0}
+        title="Account details"
+        onClick={event => {
+          event.stopPropagation();
+          setIsOpen(false);
+          navigate('/account');
+        }}
+        onKeyDown={event => {
+          if (event.key === 'Enter' || event.key === ' ') {
+            event.stopPropagation();
+            setIsOpen(false);
+            navigate('/account');
+          }
+        }}
+        className="rounded p-1 text-gray-400 transition-colors hover:bg-gray-200 hover:text-gray-700"
+      >
+        <Settings2 className="h-4 w-4" />
+      </span>
+    );
+  }
+
   return (
     <div className="relative">
       <button
@@ -94,7 +120,10 @@ export function AccountSwitcher() {
                       {accountDisplayName(account)}
                     </span>
                     {account.id === activeAccountId && (
-                      <Check className="h-4 w-4 text-green-600" />
+                      <>
+                        <Check className="h-4 w-4 text-green-600" />
+                        <AccountDetailsShortcut />
+                      </>
                     )}
                   </button>
                 ))}
@@ -121,7 +150,10 @@ export function AccountSwitcher() {
                       </span>
                     )}
                     {account.id === activeAccountId && (
-                      <Check className="h-4 w-4 flex-shrink-0 text-green-600" />
+                      <>
+                        <Check className="h-4 w-4 flex-shrink-0 text-green-600" />
+                        <AccountDetailsShortcut />
+                      </>
                     )}
                   </button>
                 ))}

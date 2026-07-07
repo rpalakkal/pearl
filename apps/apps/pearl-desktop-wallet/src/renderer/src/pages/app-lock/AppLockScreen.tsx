@@ -1,6 +1,8 @@
 import {useEffect, useState} from 'react';
-import {AlertCircle, Eye, EyeOff, Lock} from 'lucide-react';
+import {AlertCircle, AlertTriangle, Eye, EyeOff, Loader2, Lock} from 'lucide-react';
 import {useLocation, useNavigate} from 'react-router-dom';
+import {Dialog, DialogContent, DialogHeader, DialogTitle} from '@/components/ui/dialog';
+import {Input} from '@/components/ui/input';
 import {getErrorMessage} from '../../lib/utils';
 import {NetworkSelector} from '../../components/NetworkSelector';
 import {SettingsButton} from '../../components/SettingsButton';
@@ -187,9 +189,128 @@ export default function AppLockScreen() {
             password, you will need your recovery phrases to restore your wallets.
           </p>
 
+          <div className="text-center">
+            <ResetAppButton disabled={isBusy} />
+          </div>
+
           <div className="h-4 flex-shrink-0 sm:h-8"></div>
         </div>
       </div>
     </div>
+  );
+}
+
+// Forgot-password escape hatch: wipes the vault and all software wallet data
+// after a typed confirmation, then routes back to onboarding.
+function ResetAppButton({disabled}: {disabled: boolean}) {
+  const navigate = useNavigate();
+  const [isOpen, setIsOpen] = useState(false);
+  const [confirmation, setConfirmation] = useState('');
+  const [isResetting, setIsResetting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  function close() {
+    if (!isResetting) {
+      setIsOpen(false);
+      setConfirmation('');
+      setError(null);
+    }
+  }
+
+  async function resetApp() {
+    setIsResetting(true);
+    setError(null);
+    try {
+      await window.appBridge.appLock.reset();
+      // Stale account pointers and remembered hardware accounts go with it.
+      localStorage.clear();
+      navigate('/', {replace: true});
+    } catch (err) {
+      setError(getErrorMessage(err, 'Failed to reset the app'));
+      setIsResetting(false);
+    }
+  }
+
+  return (
+    <>
+      <button
+        type="button"
+        onClick={() => setIsOpen(true)}
+        disabled={disabled}
+        className="text-xs text-gray-400 underline-offset-2 transition-colors hover:text-gray-600 hover:underline disabled:opacity-50"
+      >
+        Forgot your password? Reset app
+      </button>
+
+      <Dialog open={isOpen} onOpenChange={open => !open && close()}>
+        <DialogContent className="max-w-md bg-white">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <AlertTriangle className="h-5 w-5 text-red-600" />
+              Reset Pearl Wallet?
+            </DialogTitle>
+          </DialogHeader>
+          <form
+            className="space-y-3"
+            onSubmit={event => {
+              event.preventDefault();
+              if (confirmation === 'RESET' && !isResetting) {
+                void resetApp();
+              }
+            }}
+          >
+            <div className="space-y-2 text-sm text-gray-600">
+              <p>This permanently deletes from this device:</p>
+              <ul className="list-inside list-disc space-y-1 text-xs">
+                <li>the app password and encrypted vault</li>
+                <li>
+                  all software wallet data — restoring them afterwards requires their recovery
+                  phrases
+                </li>
+                <li>remembered hardware accounts (reconnect the device to re-add them)</li>
+              </ul>
+              <p>Contacts and network settings are kept. Funds stay on the blockchain.</p>
+            </div>
+            <div>
+              <label className="mb-1 block text-xs font-medium text-gray-700">
+                Type <span className="font-mono">RESET</span> to confirm
+              </label>
+              <Input
+                value={confirmation}
+                onChange={event => setConfirmation(event.target.value)}
+                placeholder="RESET"
+                autoFocus
+                className="bg-white font-mono"
+              />
+            </div>
+            {error && (
+              <div className="flex items-center gap-2 rounded-lg border border-red-300 bg-red-50 p-3 text-sm text-red-700">
+                <AlertCircle className="h-4 w-4 flex-shrink-0" />
+                {error}
+              </div>
+            )}
+            <div className="flex gap-3">
+              <Button
+                type="button"
+                variant="outline"
+                className="flex-1"
+                onClick={close}
+                disabled={isResetting}
+              >
+                Cancel
+              </Button>
+              <Button
+                type="submit"
+                className="flex-1 bg-red-600 text-white hover:bg-red-700"
+                disabled={confirmation !== 'RESET' || isResetting}
+              >
+                {isResetting ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+                Reset app
+              </Button>
+            </div>
+          </form>
+        </DialogContent>
+      </Dialog>
+    </>
   );
 }

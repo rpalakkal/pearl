@@ -223,6 +223,15 @@ interface AppLockApi {
   // Migration: stores a legacy wallet passphrase the user just typed, after
   // main verifies it against the running wallet.
   storeWalletPassphrase: (walletName: string, passphrase: string) => Promise<void>;
+
+  // Recovery phrases are vaulted at create/import; wallets created before
+  // that existed have none (hasWalletMnemonic=false).
+  hasWalletMnemonic: (walletName: string) => Promise<boolean>;
+
+  revealWalletMnemonic: (walletName: string, password: string) => Promise<string | null>;
+
+  // Forgot-password reset: deletes the vault and all software wallet data.
+  reset: () => Promise<void>;
 }
 
 interface ManagerApi {
@@ -239,6 +248,10 @@ interface ManagerApi {
     seed: string;
     password?: string;
   }) => Promise<{name: string; seed: string}>;
+
+  renameWallet: (oldName: string, newName: string) => Promise<{name: string}>;
+
+  deleteWallet: (name: string, password: string) => Promise<void>;
 
   getExistingWallets: () => Promise<{
     walletNames: string[];

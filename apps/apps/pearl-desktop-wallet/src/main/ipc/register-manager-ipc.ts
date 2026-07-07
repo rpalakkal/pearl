@@ -6,6 +6,8 @@ function registerManagerIpc(ms: ManagerService) {
   ipcMain.handle('select-wallet', (_, walletName) => ms.selectWallet(walletName));
   ipcMain.handle('wallet-create', (_, options) => ms.create(options));
   ipcMain.handle('wallet-import', (_, options) => ms.import(options));
+  ipcMain.handle('wallet-rename', (_, oldName, newName) => ms.renameWallet(oldName, newName));
+  ipcMain.handle('wallet-delete', (_, name, password) => ms.deleteWallet(name, password));
   ipcMain.handle('get-existing-wallets', () => ms.getExistingWallets());
 
   // Network management

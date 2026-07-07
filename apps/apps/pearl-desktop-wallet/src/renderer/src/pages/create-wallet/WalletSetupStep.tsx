@@ -1,5 +1,9 @@
 import { useForm } from '@tanstack/react-form';
-import { displayToFs, isValidFilename } from '../../../../utils/filename-utils';
+import { displayToFs } from '../../../../utils/filename-utils';
+import {
+  validateWalletNameAvailable,
+  validateWalletNameFormat,
+} from '../../lib/walletNameValidation';
 import WalletSetupHeader from './WalletSetupHeader';
 import WalletNameField from './WalletNameField';
 import SecurityNotice from './SecurityNotice';
@@ -21,17 +25,11 @@ export default function WalletSetupStep({ onCreate, onBack }: WalletSetupStepPro
   });
 
   function validateWalletName(val: string) {
-    if (!val?.trim()) return 'Please enter a wallet name';
-    if (!isValidFilename(val)) return 'Invalid wallet name';
+    return validateWalletNameFormat(val) ?? undefined;
   }
 
   async function validateWalletNameAsync(val: string) {
-    const normalized = displayToFs(val);
-    const { walletNames } = await window.appBridge.manager.getExistingWallets();
-    const equivalentWalletName = walletNames.find(wallet => wallet.toLowerCase() === normalized.toLowerCase());
-    if (equivalentWalletName) {
-      return `A wallet named "${equivalentWalletName}" exists. Please choose a different name.`;
-    }
+    return (await validateWalletNameAvailable(val)) ?? undefined;
   }
 
   return (

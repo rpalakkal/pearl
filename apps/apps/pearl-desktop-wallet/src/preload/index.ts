@@ -81,6 +81,11 @@ const appLockIpc: Ipc<AppLockApi> = {
     ipcRenderer.invoke('app-lock-has-wallet-passphrase', walletName),
   storeWalletPassphrase: (walletName, passphrase) =>
     ipcRenderer.invoke('app-lock-store-wallet-passphrase', walletName, passphrase),
+  hasWalletMnemonic: walletName =>
+    ipcRenderer.invoke('app-lock-has-wallet-mnemonic', walletName),
+  revealWalletMnemonic: (walletName, password) =>
+    ipcRenderer.invoke('app-lock-reveal-wallet-mnemonic', walletName, password),
+  reset: () => ipcRenderer.invoke('app-lock-reset'),
 };
 
 const managerIpc: Ipc<ManagerApi> = {
@@ -88,6 +93,8 @@ const managerIpc: Ipc<ManagerApi> = {
   selectWallet: walletName => ipcRenderer.invoke('select-wallet', walletName),
   create: options => ipcRenderer.invoke('wallet-create', options),
   import: options => ipcRenderer.invoke('wallet-import', options),
+  renameWallet: (oldName, newName) => ipcRenderer.invoke('wallet-rename', oldName, newName),
+  deleteWallet: (name, password) => ipcRenderer.invoke('wallet-delete', name, password),
   getExistingWallets: () => ipcRenderer.invoke('get-existing-wallets'),
   getNetworkInfo: () => ipcRenderer.invoke('get-network-info'),
   setNetwork: network => ipcRenderer.invoke('set-network', network),

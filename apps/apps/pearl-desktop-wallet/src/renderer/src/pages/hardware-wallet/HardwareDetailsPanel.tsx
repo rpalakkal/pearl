@@ -1,6 +1,17 @@
 import {Button} from '@/components/ui/button';
 import {CopyButton} from '@/components/ui/copy-button';
 import {Bech32Address} from '@/components/ui/bech32-address';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from '@/components/ui/alert-dialog';
 import type {HardwareWalletDetailsModel, HardwareWalletViewActions} from './viewModel.ts';
 
 export function HardwareDetailsPanel({
@@ -37,15 +48,31 @@ export function HardwareDetailsPanel({
         </div>
       )}
 
-      <Button
-        type="button"
-        variant="outline"
-        className="w-full"
-        onClick={actions.forgetHardwareAccount}
-        disabled={hasPendingDeviceOperation}
-      >
-        Forget {model.connectedLabel} Account
-      </Button>
+      <AlertDialog>
+        <AlertDialogTrigger asChild>
+          <Button type="button" variant="outline" className="w-full" disabled={hasPendingDeviceOperation}>
+            Forget {model.connectedLabel} Account
+          </Button>
+        </AlertDialogTrigger>
+        <AlertDialogContent className="bg-white">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Forget {model.connectedLabel} account?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This removes the account from this app only. Your keys never leave the device —
+              reconnect your {model.connectedLabel} to add it back anytime.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-red-600 text-white hover:bg-red-700"
+              onClick={actions.forgetHardwareAccount}
+            >
+              Forget account
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </>
   );
 }
