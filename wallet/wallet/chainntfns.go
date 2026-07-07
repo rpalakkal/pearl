@@ -336,6 +336,17 @@ func (w *Wallet) addRelevantTx(dbtx walletdb.ReadWriteTx, rec *wtxmgr.TxRecord,
 	// only for the addresses tracked at first sight, and the new address's
 	// balance stayed short. AddCredit is idempotent per (tx, output, block),
 	// so re-scanning existing records is safe and cheap.
+	//
+	// The mirror case matters just as much: an existing recorded tx may
+	// SPEND credits that were only discovered later (by the re-scan above),
+	// and its insert-time debit pass could not have known about them. Left
+	// alone, those credits count as spendable forever. Reconcile the inputs
+	// so such credits are marked spent.
+	if exists && block != nil {
+		if err := w.TxStore.ReconcileInputs(txmgrNs, rec, block); err != nil {
+			return err
+		}
+	}
 
 	// Check every output to determine whether it is controlled by a wallet
 	// key.  If so, mark the output as a credit.

@@ -2901,3 +2901,108 @@ func TestOutputLocks(t *testing.T) {
 		})
 	}
 }
+
+// TestReconcileInputsLateCredit reproduces the late-imported-address bug:
+// both a funding tx and its spender get recorded while neither is relevant
+// (no credits — e.g. they were seen by another account's scan), then a later
+// import discovers the funding credit. Without reconciliation the credit
+// counts as unspent forever even though a recorded transaction spends it.
+func TestReconcileInputsLateCredit(t *testing.T) {
+	t.Parallel()
+
+	s, db, err := testStore(t)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+
+	err = walletdb.Update(db, func(dbtx walletdb.ReadWriteTx) error {
+		ns := dbtx.ReadWriteBucket(namespaceKey)
+
+		recvRec, err := NewTxRecord(TstRecvSerializedTx, time.Now())
+		if err != nil {
+			return err
+		}
+		spendRec, err := NewTxRecord(TstSpendingSerializedTx, time.Now())
+		if err != nil {
+			return err
+		}
+
+		// Both transactions recorded with no credits (seen before the
+		// receiving address was tracked).
+		if err := s.InsertTx(ns, recvRec, TstRecvTxBlockDetails); err != nil {
+			return err
+		}
+		if err := s.InsertTx(ns, spendRec, TstSignedTxBlockDetails); err != nil {
+			return err
+		}
+
+		// A later import/backfill discovers the credit on the funding tx.
+		err = s.AddCredit(ns, recvRec, TstRecvTxBlockDetails, 0, false)
+		if err != nil {
+			return err
+		}
+
+		// Phantom state: the credit shows as unspent although spendRec
+		// (already recorded) consumes it.
+		unspent, err := s.UnspentOutputs(ns)
+		if err != nil {
+			return err
+		}
+		if len(unspent) != 1 {
+			return fmt.Errorf("expected 1 phantom unspent before "+
+				"reconcile, got %d", len(unspent))
+		}
+
+		// Reconciling the existing spender's inputs must mark it spent.
+		err = s.ReconcileInputs(ns, spendRec, TstSignedTxBlockDetails)
+		if err != nil {
+			return err
+		}
+
+		unspent, err = s.UnspentOutputs(ns)
+		if err != nil {
+			return err
+		}
+		if len(unspent) != 0 {
+			return fmt.Errorf("expected 0 unspent after reconcile, "+
+				"got %d", len(unspent))
+		}
+
+		balance, err := s.Balance(ns, 1, TstRecvCurrentHeight)
+		if err != nil {
+			return err
+		}
+		if balance != 0 {
+			return fmt.Errorf("expected zero balance after "+
+				"reconcile, got %v", balance)
+		}
+
+		// The spend must now be visible as a debit on the spender.
+		details, err := s.TxDetails(ns, &spendRec.Hash)
+		if err != nil {
+			return err
+		}
+		if details == nil || len(details.Debits) != 1 {
+			return fmt.Errorf("expected 1 debit on spender after reconcile")
+		}
+
+		// Reconciling again is a no-op.
+		err = s.ReconcileInputs(ns, spendRec, TstSignedTxBlockDetails)
+		if err != nil {
+			return err
+		}
+		balance, err = s.Balance(ns, 1, TstRecvCurrentHeight)
+		if err != nil {
+			return err
+		}
+		if balance != 0 {
+			return fmt.Errorf("balance changed on repeated reconcile: %v", balance)
+		}
+
+		return nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+}

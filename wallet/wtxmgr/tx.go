@@ -335,6 +335,61 @@ func (s *Store) updateMinedBalance(ns walletdb.ReadWriteBucket, rec *TxRecord,
 	return nil
 }
 
+// ReconcileInputs marks as spent any wallet credits consumed by an
+// already-recorded mined transaction. Inserting a transaction records debits
+// only for the credits known at insertion time; a credit discovered later
+// (an address imported after the transaction was first recorded, followed by
+// a backfill) leaves the earlier spending record without its debit, and the
+// credit incorrectly counts as unspent balance. Idempotent: inputs whose
+// credits are already spent no longer have unspent entries and are skipped.
+func (s *Store) ReconcileInputs(ns walletdb.ReadWriteBucket, rec *TxRecord,
+	block *BlockMeta) error {
+
+	minedBalance, err := fetchMinedBalance(ns)
+	if err != nil {
+		return err
+	}
+
+	spender := indexedIncidence{
+		incidence: incidence{
+			txHash: rec.Hash,
+			block:  block.Block,
+		},
+	}
+
+	newMinedBalance := minedBalance
+	for i, input := range rec.MsgTx.TxIn {
+		unspentKey, credKey := existsUnspent(ns, &input.PreviousOutPoint)
+		if credKey == nil {
+			continue
+		}
+
+		log.Debugf("Reconciling spend of credit %v by existing tx %v:%d",
+			input.PreviousOutPoint, rec.Hash, i)
+
+		spender.index = uint32(i)
+		amt, err := spendCredit(ns, credKey, &spender)
+		if err != nil {
+			return err
+		}
+		err = putDebit(ns, &rec.Hash, uint32(i), amt, &block.Block, credKey)
+		if err != nil {
+			return err
+		}
+		if err := deleteRawUnspent(ns, unspentKey); err != nil {
+			return err
+		}
+
+		newMinedBalance -= amt
+	}
+
+	if newMinedBalance != minedBalance {
+		return putMinedBalance(ns, newMinedBalance)
+	}
+
+	return nil
+}
+
 // deleteUnminedTx deletes an unmined transaction from the store.
 //
 // NOTE: This should only be used once the transaction has been mined.
