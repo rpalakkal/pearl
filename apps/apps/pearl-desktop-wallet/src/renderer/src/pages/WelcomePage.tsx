@@ -161,7 +161,7 @@ export default function WelcomePage() {
           size="lg"
           className="w-full hover:bg-gray-100 hover:text-gray-900"
         >
-          <Link to="/hardware-wallet">
+          <Link to="/onboarding/connect-hardware">
             <Usb className="h-4 w-4" />
             Connect Hardware Wallet
           </Link>

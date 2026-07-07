@@ -5,6 +5,7 @@ import {
   getHardwareWalletErrorMessage,
   getHardwareWalletProviderName,
   parsePearlAmountToSats,
+  preloadHardwareWalletSupport,
   previewHardwarePearlSend,
   verifyHardwareWalletAddress,
   type HardwareWalletAddress,
@@ -143,6 +144,12 @@ export function useHardwareAccount(
 
   const isActiveHardwareAccount = (candidate: HardwareWalletAddress): boolean =>
     accountKeyRef.current === hardwareAccountKey(candidate);
+
+  // Warm up the device transport modules so the first sign/verify prompt is
+  // fast.
+  useEffect(() => {
+    preloadHardwareWalletSupport();
+  }, []);
 
   // Account switched (or cleared): drop all per-account state and load fresh.
   useEffect(() => {

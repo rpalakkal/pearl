@@ -1,4 +1,4 @@
-import {HashRouter as Router, Routes, Route, useLocation} from 'react-router-dom';
+import {HashRouter as Router, Routes, Route, Navigate, useLocation} from 'react-router-dom';
 import WelcomePage from './pages/WelcomePage';
 import ImportAccount from './pages/ImportAccount';
 import CreateWallet from './pages/create-wallet/CreateWallet';
@@ -10,7 +10,7 @@ import AccountDetailsPage from './pages/unified/AccountDetailsPage';
 import AppLockScreen from './pages/app-lock/AppLockScreen';
 import AppLockSetup from './pages/app-lock/AppLockSetup';
 import ChangePassword from './pages/ChangePassword';
-import HardwareWallet from './pages/HardwareWallet';
+import ConnectHardware from './pages/onboarding/ConnectHardware';
 import AppShell from './components/app-shell/AppShell';
 import {useNavigate} from 'react-router-dom';
 import {SyncWallet} from './SyncWallet';
@@ -32,6 +32,7 @@ function AppContent() {
           <Route path="/setup" element={<AppLockSetup />} />
           <Route path="/import-account" element={<ImportAccount />} />
           <Route path="/onboarding/create" element={<CreateWallet />} />
+          <Route path="/onboarding/connect-hardware" element={<ConnectHardware />} />
 
           {/* Everything behind the lock shares the shell (account switcher,
               network selector, lock) */}
@@ -40,7 +41,8 @@ function AppContent() {
             <Route path="/send" element={<UnifiedSend />} />
             <Route path="/receive" element={<UnifiedReceive />} />
             <Route path="/account" element={<AccountDetailsPage />} />
-            <Route path="/hardware-wallet" element={<HardwareWallet />} />
+            {/* Dissolved into the unified pages; keep old links working. */}
+            <Route path="/hardware-wallet" element={<Navigate to="/wallet" replace />} />
             <Route path="/change-password" element={<ChangePassword />} />
             <Route path="/activity" element={<ActivityPage onBack={() => navigate('/wallet')} />} />
           </Route>

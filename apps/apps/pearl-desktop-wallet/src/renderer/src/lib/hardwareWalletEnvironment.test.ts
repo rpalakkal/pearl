@@ -99,8 +99,12 @@ test('preloads hardware wallet modules before user-triggered device prompts', ()
     ),
     'utf8'
   );
-  const hardwareWalletController = readFileSync(
-    new URL('../pages/hardware-wallet/useHardwareWalletController.tsx', import.meta.url),
+  const hardwareAccountHook = readFileSync(
+    new URL('../hooks/hardware/useHardwareAccount.ts', import.meta.url),
+    'utf8'
+  );
+  const connectHardwarePage = readFileSync(
+    new URL('../pages/onboarding/ConnectHardware.tsx', import.meta.url),
     'utf8'
   );
 
@@ -111,7 +115,8 @@ test('preloads hardware wallet modules before user-triggered device prompts', ()
   assert.match(browserSource, /import\('@ledgerhq\/hw-transport-webhid'\)/);
   assert.match(browserSource, /import\('@ledgerhq\/hw-app-btc'\)/);
   assert.match(browserSource, /import\('@trezor\/connect-web'\)/);
-  assert.match(hardwareWalletController, /preloadHardwareWalletSupport\(\)/);
+  assert.match(hardwareAccountHook, /preloadHardwareWalletSupport\(\)/);
+  assert.match(connectHardwarePage, /preloadHardwareWalletSupport\(\)/);
 });
 
 test('installs the Buffer polyfill before loading browser hardware dependencies', () => {
