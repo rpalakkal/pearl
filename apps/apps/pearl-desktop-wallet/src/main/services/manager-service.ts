@@ -45,6 +45,10 @@ function getBaseConfig() {
 }
 
 class ManagerService implements ManagerApi {
+  // Long RPC unlock window; main re-arms it from the vault on demand, so the
+  // renderer never deals with silent wallet re-locks.
+  static readonly WALLET_UNLOCK_TIMEOUT_SECONDS = 7 * 24 * 3600;
+
   private walletService: WalletService | null = null;
   private currentWallet: WalletData | null = null;
   private walletProcess: WalletProcess | null = null;

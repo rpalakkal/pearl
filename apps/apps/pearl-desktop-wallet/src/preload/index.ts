@@ -1,6 +1,7 @@
 import {contextBridge, ipcRenderer} from 'electron';
 import {
   AppBridge,
+  AppLockApi,
   ContactsApi,
   SendHistoryApi,
   HardwareWalletApi,
@@ -65,6 +66,18 @@ const sendHistoryIpc: Ipc<SendHistoryApi> = {
     ipcRenderer.invoke('send-history-recipient-status', address, network),
 };
 
+const appLockIpc: Ipc<AppLockApi> = {
+  getStatus: () => ipcRenderer.invoke('app-lock-status'),
+  setup: password => ipcRenderer.invoke('app-lock-setup', password),
+  unlock: password => ipcRenderer.invoke('app-lock-unlock', password),
+  lock: options => ipcRenderer.invoke('app-lock-lock', options),
+  changePassword: (current, next) => ipcRenderer.invoke('app-lock-change-password', current, next),
+  hasWalletPassphrase: walletName =>
+    ipcRenderer.invoke('app-lock-has-wallet-passphrase', walletName),
+  storeWalletPassphrase: (walletName, passphrase) =>
+    ipcRenderer.invoke('app-lock-store-wallet-passphrase', walletName, passphrase),
+};
+
 const managerIpc: Ipc<ManagerApi> = {
   getWalletsStats: () => ipcRenderer.invoke('get-wallets-stats'),
   selectWallet: walletName => ipcRenderer.invoke('select-wallet', walletName),
@@ -104,6 +117,7 @@ const appBridge: AppBridge = {
   hardwareWallet: hardwareWalletIpc,
   contacts: contactsIpc,
   sendHistory: sendHistoryIpc,
+  appLock: appLockIpc,
   manager: managerIpc,
   sync: syncIpc,
   update: updateIpc,

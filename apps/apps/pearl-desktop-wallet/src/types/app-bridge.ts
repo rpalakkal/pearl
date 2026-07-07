@@ -166,6 +166,28 @@ interface SendHistoryApi {
   getRecipientStatus: (address: string, network: AppNetwork) => Promise<RecipientSendStatus>;
 }
 
+// App-wide lock: one password gates the app; software wallet passphrases are
+// stored in an encrypted vault held by the main process.
+type AppLockStatus = 'uninitialized' | 'locked' | 'unlocked';
+
+interface AppLockApi {
+  getStatus: () => Promise<AppLockStatus>;
+
+  setup: (password: string) => Promise<void>;
+
+  unlock: (password: string) => Promise<void>;
+
+  lock: (options?: {force?: boolean}) => Promise<void>;
+
+  changePassword: (current: string, next: string) => Promise<void>;
+
+  hasWalletPassphrase: (walletName: string) => Promise<boolean>;
+
+  // Migration: stores a legacy wallet passphrase the user just typed, after
+  // main verifies it against the running wallet.
+  storeWalletPassphrase: (walletName: string, passphrase: string) => Promise<void>;
+}
+
 interface ManagerApi {
   getWalletsStats: () => {name?: string};
 
@@ -273,6 +295,7 @@ interface AppBridge {
   hardwareWallet: Ipc<HardwareWalletApi>;
   contacts: Ipc<ContactsApi>;
   sendHistory: Ipc<SendHistoryApi>;
+  appLock: Ipc<AppLockApi>;
   manager: Ipc<ManagerApi>;
   sync: Ipc<SyncApi>;
   update: UpdateApi;
@@ -295,6 +318,8 @@ export type {
   ContactsApi,
   RecipientSendStatus,
   SendHistoryApi,
+  AppLockApi,
+  AppLockStatus,
   ManagerApi,
   SyncApi,
   SyncProgress,

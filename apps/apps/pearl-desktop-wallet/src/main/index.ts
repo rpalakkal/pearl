@@ -8,6 +8,7 @@ import { registerWindowIpc } from './ipc/register-window-ipc';
 import { registerManagerIpc } from './ipc/register-manager-ipc';
 import { registerContactsIpc } from './ipc/register-contacts-ipc';
 import { registerSendHistoryIpc } from './ipc/register-send-history-ipc';
+import { registerAppLockIpc } from './ipc/register-app-lock-ipc';
 import { ManagerService } from './services/manager-service';
 import { registerSyncIpc } from './ipc/register-sync-ipc';
 import { SyncService } from './services/sync-service';
@@ -81,6 +82,8 @@ app.whenReady().then(() => {
   registerContactsIpc();
 
   registerSendHistoryIpc(managerService);
+
+  registerAppLockIpc(managerService);
 
   const syncService = new SyncService(managerService);
   registerSyncIpc(syncService);
