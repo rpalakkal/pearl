@@ -4,7 +4,7 @@ import {usePagination} from '../hooks/usePagination';
 import {useHardwareActivity} from '../hooks/hardware/useHardwareActivity';
 import {useActiveAccount} from '../store/accountsStore';
 import {Button} from '@/components/ui/button';
-import {useState} from 'react';
+import {useEffect, useRef, useState} from 'react';
 
 interface ActivityPageProps {
   onBack: () => void;
@@ -40,10 +40,31 @@ const truncateTxId = (txid: string): string => {
 export default function ActivityPage({onBack}: ActivityPageProps) {
   const active = useActiveAccount();
   const isHardware = active?.kind === 'hardware';
-  const software = usePagination({pageSize: 10, enabled: !isHardware});
+  const software = usePagination({pageSize: 25, enabled: !isHardware});
   const hardware = useHardwareActivity(isHardware ? active : null);
   const {activities, loading, hasMore, loadMore} = isHardware ? hardware : software;
   const [copiedTxId, setCopiedTxId] = useState<string | null>(null);
+
+  // Infinite scroll: auto-load the next page when the sentinel at the list's
+  // end scrolls into view. The Load More button stays as a manual fallback.
+  const sentinelRef = useRef<HTMLDivElement | null>(null);
+  const loadMoreRef = useRef(loadMore);
+  loadMoreRef.current = loadMore;
+  const canAutoLoad = hasMore && !loading;
+
+  useEffect(() => {
+    const sentinel = sentinelRef.current;
+    if (!sentinel || !canAutoLoad) {
+      return;
+    }
+    const observer = new IntersectionObserver(entries => {
+      if (entries.some(entry => entry.isIntersecting)) {
+        loadMoreRef.current();
+      }
+    });
+    observer.observe(sentinel);
+    return () => observer.disconnect();
+  }, [canAutoLoad]);
 
   const handleCopyTxId = async (txid: string) => {
     try {
@@ -149,6 +170,9 @@ export default function ActivityPage({onBack}: ActivityPageProps) {
                 </div>
               </div>
             ))}
+
+            {/* Invisible sentinel: scrolling it into view auto-loads the next page. */}
+            <div ref={sentinelRef} aria-hidden className="h-px" />
 
             {loading && activities.length > 0 && (
               <div className="py-2 text-center text-sm text-gray-500">Loading more...</div>
