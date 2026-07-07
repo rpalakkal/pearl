@@ -94,7 +94,11 @@ export function HardwareDashboard({account}: {account: WalletAccount & {kind: 'h
                     </div>
                     <div>
                       <div className="font-medium text-gray-900">
-                        {tx.type === 'received' ? 'Received' : 'Sent'}
+                        {tx.selfTransfer
+                          ? 'Sent to self'
+                          : tx.type === 'received'
+                            ? 'Received'
+                            : 'Sent'}
                       </div>
                       <div className="text-xs text-gray-500">
                         {tx.confirmations} confirmations

@@ -737,6 +737,7 @@ func getAddressHistory(icmd interface{}, w *wallet.Wallet) (interface{}, error) 
 			Category:      category,
 			Amount:        entry.Amount.ToPRL(),
 			Fee:           entry.Fee.ToPRL(),
+			SelfTransfer:  entry.SelfTransfer,
 			Counterparty:  entry.Counterparty,
 			Confirmations: confirmations,
 			Time:          entry.Timestamp.Unix(),

@@ -25,9 +25,12 @@ type AddressHistoryEntry struct {
 	TxHash chainhash.Hash
 	// Sent is true when the address's own outputs funded this transaction.
 	Sent bool
+	// SelfTransfer is true when every output returned to the address —
+	// nothing actually left the account except the fee.
+	SelfTransfer bool
 	// Amount paid to the address (receives) or to other parties (sends),
-	// in satoshis. A self-transfer (every output returns to the address)
-	// reports the returned amount.
+	// in satoshis. A self-transfer reports the net cost (the fee), not the
+	// recycled balance.
 	Amount btcutil.Amount
 	// Fee is the transaction fee when the wallet knew every input of a
 	// send; zero otherwise.
@@ -150,12 +153,14 @@ func classifyForAddress(ns walletdb.ReadBucket, store *wtxmgr.Store,
 	if sentSats > 0 {
 		entry.Sent = true
 		entry.Amount = totalOut - toAddr // paid to others
-		if entry.Amount == 0 {
-			// Self-transfer: everything returned to the address.
-			entry.Amount = toAddr
-		}
 		if debitTotal >= totalOut {
 			entry.Fee = debitTotal - totalOut
+		}
+		if entry.Amount == 0 {
+			// Self-transfer: everything returned to the address; the
+			// fee is the only real change.
+			entry.SelfTransfer = true
+			entry.Amount = entry.Fee
 		}
 		entry.Counterparty = counterparty
 	} else {

@@ -48,8 +48,6 @@ test('validates transaction hex and normalizes broadcast txid responses', () => 
 
 // ---- Address transaction history normalizer ----
 
-// ---- Address transaction history normalizer ----
-
 const OUR = 'prl1qouraddress';
 const OTHER = 'prl1qotheraddress';
 
@@ -107,20 +105,23 @@ test('normalizes a sent transaction with change and fee', () => {
   assert.equal(tx.address, OTHER);
 });
 
-test('self-send counts outputs back to us as the amount', () => {
+test('self-send is flagged and reports the fee as the net amount', () => {
   const {transactions} = normalizeBlockbookAddressTransactions(
     {
       transactions: [
         historyTx({
           vin: [{addresses: [OUR], value: '100000000'}],
           vout: [{addresses: [OUR], value: '99999750'}],
+          fees: '250',
         }),
       ],
     },
     OUR
   );
   assert.equal(transactions[0].type, 'sent');
-  assert.equal(transactions[0].amount, 0.9999975);
+  assert.equal(transactions[0].selfTransfer, true);
+  // Net change is the fee, not the recycled balance.
+  assert.equal(transactions[0].amount, 0.0000025);
 });
 
 test('mempool transactions tolerate missing block fields', () => {

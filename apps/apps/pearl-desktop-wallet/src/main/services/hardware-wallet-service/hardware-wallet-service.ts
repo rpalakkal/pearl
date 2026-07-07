@@ -201,6 +201,7 @@ export const HardwareWalletService = {
       blockhash: entry.blockhash ?? '',
       trusted: false,
       generated: false,
+      selfTransfer: entry.selfTransfer === true,
     }));
 
     const start = (page - 1) * pageSize;

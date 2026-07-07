@@ -126,7 +126,11 @@ export default function ActivityPage({onBack}: ActivityPageProps) {
                     </div>
                     <div>
                       <div className="text-lg font-medium text-gray-900">
-                        {activity.type === 'received' ? 'Received' : 'Sent'}
+                        {activity.selfTransfer
+                          ? 'Sent to self'
+                          : activity.type === 'received'
+                            ? 'Received'
+                            : 'Sent'}
                       </div>
                       <div className="text-sm text-gray-600">
                         {formatTimeAgo(activity.time)} • {formatFullDate(activity.time)}

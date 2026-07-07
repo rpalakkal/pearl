@@ -129,6 +129,7 @@ class WalletRpcMethods {
         category: 'send' | 'receive';
         amount: number;
         fee: number;
+        selfTransfer?: boolean;
         counterparty?: string;
         confirmations: number;
         time: number;

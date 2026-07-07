@@ -370,6 +370,8 @@ type AddressHistoryResult struct {
 	Category      string  `json:"category"` // "send" or "receive"
 	Amount        float64 `json:"amount"`
 	Fee           float64 `json:"fee"`
+	// Every output returned to the queried address; Amount is the fee.
+	SelfTransfer  bool    `json:"selfTransfer,omitempty"`
 	Counterparty  string  `json:"counterparty,omitempty"`
 	Confirmations int32   `json:"confirmations"`
 	Time          int64   `json:"time"`

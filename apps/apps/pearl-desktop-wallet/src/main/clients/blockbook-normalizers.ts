@@ -164,8 +164,12 @@ function normalizeBlockbookHistoryTransaction(
 
   const sent = vins.some(isOurs);
 
+  const feeSats =
+    sent && typeof raw.fees === 'string' && /^\d+$/.test(raw.fees) ? BigInt(raw.fees) : 0n;
+
   let amountSats = 0n;
   let counterparty = ourAddress;
+  let selfTransfer = false;
   if (sent) {
     for (const vout of vouts) {
       if (!isOurs(vout)) {
@@ -176,10 +180,11 @@ function normalizeBlockbookHistoryTransaction(
       }
     }
     if (amountSats === 0n) {
-      // Self-send: every output returns to us.
-      for (const vout of vouts) {
-        amountSats += entryValueSats(vout);
-      }
+      // Self-transfer: every output returned to us, so nothing actually
+      // left the account. Report the net cost (the fee), not the recycled
+      // balance — showing the full amount reads as funds leaving.
+      selfTransfer = true;
+      amountSats = feeSats;
     }
   } else {
     for (const vout of vouts) {
@@ -189,8 +194,6 @@ function normalizeBlockbookHistoryTransaction(
     }
   }
 
-  const feeSats =
-    sent && typeof raw.fees === 'string' && /^\d+$/.test(raw.fees) ? BigInt(raw.fees) : 0n;
   const blockTime =
     typeof raw.blockTime === 'number' && Number.isFinite(raw.blockTime) ? raw.blockTime : null;
 
@@ -199,6 +202,7 @@ function normalizeBlockbookHistoryTransaction(
     type: sent ? 'sent' : 'received',
     amount: satsToPearlNumber(amountSats),
     fee: satsToPearlNumber(feeSats),
+    selfTransfer,
     confirmations:
       typeof raw.confirmations === 'number' && Number.isSafeInteger(raw.confirmations)
         ? raw.confirmations
