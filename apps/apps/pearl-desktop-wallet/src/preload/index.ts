@@ -50,6 +50,8 @@ const walletIpc: Ipc<WalletApi> = {
 const hardwareWalletIpc: Ipc<HardwareWalletApi> = {
   getBalance: request =>
     ipcRenderer.invoke('hardware-wallet-get-balance', request),
+  getTransactions: request =>
+    ipcRenderer.invoke('hardware-wallet-get-transactions', request),
   broadcastTransaction: request =>
     ipcRenderer.invoke('hardware-wallet-broadcast-transaction', request),
 };

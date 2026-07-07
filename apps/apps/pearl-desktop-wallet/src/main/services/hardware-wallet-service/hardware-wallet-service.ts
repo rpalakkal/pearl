@@ -18,6 +18,8 @@ import type {
   HardwareWalletBalance,
   HardwareWalletBroadcastRequest,
   HardwareWalletBroadcastResult,
+  HardwareWalletTransactionsRequest,
+  HardwareWalletTransactionsResult,
 } from '../../../types/app-bridge.ts';
 
 const SATS_PER_PEARL = 100_000_000n;
@@ -157,6 +159,48 @@ export const HardwareWalletService = {
     walletService: WalletService | null
   ): Promise<HardwareWalletBalance> {
     return getHardwareWalletBalance(request, walletService);
+  },
+
+  // Transaction history for a hardware address. Prefers the local Oyster view
+  // (watch-only entries after import + rescan); falls back to the external
+  // indexer when no wallet is running or the local view has nothing yet
+  // (e.g. a rescan still in flight).
+  async getTransactions(
+    request: HardwareWalletTransactionsRequest,
+    walletService: WalletService | null
+  ): Promise<HardwareWalletTransactionsResult> {
+    const account = normalizeHardwareAccount(request);
+    const page = Math.max(1, request.page ?? 1);
+    const pageSize = Math.max(1, Math.min(100, request.pageSize ?? 25));
+
+    if (walletService) {
+      try {
+        await walletService.importPublicKey(account.publicKey, true);
+        const all = await walletService.listAllTransactions();
+        const matching = all.filter(
+          (tx: {address?: string}) => tx.address === account.address
+        );
+
+        if (matching.length > 0) {
+          const start = (page - 1) * pageSize;
+          return {
+            transactions: matching.slice(start, start + pageSize),
+            hasMore: start + pageSize < matching.length,
+            source: 'oyster',
+          };
+        }
+      } catch (error) {
+        console.error('Local hardware transaction lookup failed:', error);
+      }
+    }
+
+    const history = await BlockbookClient.getAddressTransactions(
+      account.address,
+      account.network,
+      page,
+      pageSize
+    );
+    return {...history, source: 'indexer'};
   },
 
   async broadcastTransaction(

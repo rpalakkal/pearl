@@ -1,6 +1,8 @@
 import {ArrowLeft, ArrowUpRight, ArrowDownLeft, Copy, Check} from 'lucide-react';
 import {Transaction} from '../../../types/transaction';
 import {usePagination} from '../hooks/usePagination';
+import {useHardwareActivity} from '../hooks/hardware/useHardwareActivity';
+import {useActiveAccount} from '../store/accountsStore';
 import {Button} from '@/components/ui/button';
 import {useState} from 'react';
 
@@ -36,9 +38,11 @@ const truncateTxId = (txid: string): string => {
 };
 
 export default function ActivityPage({onBack}: ActivityPageProps) {
-  const {activities, loading, hasMore, loadMore} = usePagination({
-    pageSize: 10,
-  });
+  const active = useActiveAccount();
+  const isHardware = active?.kind === 'hardware';
+  const software = usePagination({pageSize: 10, enabled: !isHardware});
+  const hardware = useHardwareActivity(isHardware ? active : null);
+  const {activities, loading, hasMore, loadMore} = isHardware ? hardware : software;
   const [copiedTxId, setCopiedTxId] = useState<string | null>(null);
 
   const handleCopyTxId = async (txid: string) => {
@@ -63,6 +67,16 @@ export default function ActivityPage({onBack}: ActivityPageProps) {
 
       {/* Content - Scrollable */}
       <div className="flex-1 overflow-y-auto p-6">
+        {isHardware && hardware.error && (
+          <div className="mb-4 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
+            {hardware.error}
+          </div>
+        )}
+        {isHardware && hardware.source === 'indexer' && !hardware.error && (
+          <div className="mb-4 text-center text-xs text-gray-400">
+            History from the network indexer (no local wallet running)
+          </div>
+        )}
         {loading && activities.length === 0 ? (
           <div className="py-12 text-center text-gray-500">
             <p>Loading activities...</p>

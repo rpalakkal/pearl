@@ -3,12 +3,14 @@ import {
   getBlockbookBaseUrl,
   normalizeBlockbookAddress,
   normalizeBlockbookAddressInfo,
+  normalizeBlockbookAddressTransactions,
   normalizeBlockbookFeeRate,
   normalizeBlockbookFeeTarget,
   normalizeBlockbookTransactionConfirmations,
   normalizeBlockbookTxid,
   normalizeBlockbookUtxoList,
   normalizeRawTransactionHex,
+  type BlockbookAddressHistory,
   type BlockbookAddressInfo,
   type BlockbookNetwork,
   type BlockbookUtxo,
@@ -128,6 +130,21 @@ export const BlockbookClient = {
     );
 
     return normalizeBlockbookAddressInfo(data, normalizedAddress);
+  },
+
+  async getAddressTransactions(
+    address: string,
+    network?: BlockbookNetwork,
+    page: number = 1,
+    pageSize: number = 25
+  ): Promise<BlockbookAddressHistory> {
+    const normalizedAddress = normalizeBlockbookAddress(address);
+    const data = await fetchBlockbookJson<unknown>(
+      network,
+      `/api/v2/address/${encodeURIComponent(normalizedAddress)}?details=txs&page=${page}&pageSize=${pageSize}`
+    );
+
+    return normalizeBlockbookAddressTransactions(data, normalizedAddress);
   },
 
   async getUtxos(address: string, network?: BlockbookNetwork): Promise<BlockbookUtxo[]> {

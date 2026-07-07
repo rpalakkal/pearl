@@ -8,6 +8,7 @@ import {pearlAmountToSatsString} from '../config/send-history-model';
 import type {
   HardwareWalletAccountRequest,
   HardwareWalletBroadcastRequest,
+  HardwareWalletTransactionsRequest,
 } from '../../types/app-bridge.ts';
 
 function registerWalletIpc(ms: ManagerService) {
@@ -80,6 +81,11 @@ function registerWalletIpc(ms: ManagerService) {
     'hardware-wallet-get-balance',
     (_event, request: HardwareWalletAccountRequest) =>
       HardwareWalletService.getBalance(request, ms.getWalletServiceIfRunning())
+  );
+  ipcMain.handle(
+    'hardware-wallet-get-transactions',
+    (_event, request: HardwareWalletTransactionsRequest) =>
+      HardwareWalletService.getTransactions(request, ms.getWalletServiceIfRunning())
   );
   ipcMain.handle(
     'hardware-wallet-broadcast-transaction',

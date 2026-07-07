@@ -145,8 +145,23 @@ interface HardwareWalletBroadcastResult {
   txid: string;
 }
 
+interface HardwareWalletTransactionsRequest extends HardwareWalletAccountRequest {
+  page?: number;
+  pageSize?: number;
+}
+
+interface HardwareWalletTransactionsResult {
+  transactions: Transaction[];
+  hasMore: boolean;
+  source: HardwareBalanceSource;
+}
+
 interface HardwareWalletApi {
   getBalance: (request: HardwareWalletAccountRequest) => Promise<HardwareWalletBalance>;
+
+  getTransactions: (
+    request: HardwareWalletTransactionsRequest
+  ) => Promise<HardwareWalletTransactionsResult>;
 
   broadcastTransaction: (
     request: HardwareWalletBroadcastRequest
@@ -314,6 +329,8 @@ export type {
   HardwareWalletAccountRequest,
   HardwareWalletBroadcastRequest,
   HardwareWalletBroadcastResult,
+  HardwareWalletTransactionsRequest,
+  HardwareWalletTransactionsResult,
   Contact,
   ContactExtras,
   ContactUpdates,

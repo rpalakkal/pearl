@@ -3,6 +3,9 @@ import { Transaction } from '../../../types/transaction';
 
 interface UsePaginationOptions {
   pageSize?: number;
+  // When false the hook stays idle (used while a hardware account is active
+  // and the software transaction list is not the data source).
+  enabled?: boolean;
 }
 
 interface UsePaginationResult {
@@ -13,7 +16,7 @@ interface UsePaginationResult {
 }
 
 export function usePagination(options: UsePaginationOptions = {}): UsePaginationResult {
-  const { pageSize = 20 } = options;
+  const { pageSize = 20, enabled = true } = options;
 
   const [activities, setActivities] = useState<Transaction[]>([]);
   const [count] = useState<number>(pageSize);
@@ -45,9 +48,11 @@ export function usePagination(options: UsePaginationOptions = {}): UsePagination
   }, [loading, hasMore, count, offset]);
 
   useEffect(() => {
-    loadMore();
+    if (enabled) {
+      loadMore();
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [enabled]);
 
   return { activities, loading, hasMore, loadMore };
 }
