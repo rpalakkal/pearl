@@ -327,29 +327,23 @@ func (w *Wallet) ImportPublicKey(pubKey *btcec.PublicKey,
 		log.Infof("Imported address %v", address)
 	}
 
-	if rescan && !isDuplicate {
-		// Rescan from genesis so outputs received before the import are
-		// discovered. Correctness-first: the rescan runs in the
-		// background, subscribes the address itself, and its completion
-		// is logged by the rescan manager. The buffered error channel
-		// does not need to be read.
-		bs := waddrmgr.BlockStamp{
-			Hash:      *w.chainParams.GenesisHash,
-			Height:    0,
-			Timestamp: w.chainParams.GenesisBlock.BlockHeader().Timestamp,
-		}
-		_ = w.SubmitRescan(&RescanJob{
-			Addrs:      []btcutil.Address{address},
-			OutPoints:  nil,
-			BlockStamp: bs,
-		})
-		return nil
-	}
-
 	err = w.chainClient.NotifyReceived([]btcutil.Address{address})
 	if err != nil {
 		return fmt.Errorf("unable to subscribe for address "+
 			"notifications: %w", err)
+	}
+
+	if rescan && !isDuplicate {
+		// Backfill from genesis so outputs received before the import
+		// are discovered. Runs in the background over the batched
+		// compact-filter path; the live subscription above covers
+		// everything past the backfill's target. Failure to start is
+		// not fatal to the import — the key is imported and subscribed,
+		// and history can be requested again via rescanaddress.
+		if _, err := w.StartAddressBackfill(address, 0); err != nil {
+			log.Errorf("Unable to start backfill for imported "+
+				"address %v: %v", address, err)
+		}
 	}
 
 	return nil

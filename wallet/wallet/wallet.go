@@ -151,9 +151,12 @@ type Wallet struct {
 	rescanFinished      chan *RescanFinishedMsg
 
 	// Explicit address backfill job tracking, keyed by encoded address.
-	// Guarded by backfillMtx; the map is created lazily.
-	backfillMtx  sync.Mutex
-	backfillJobs map[string]*BackfillJobStatus
+	// Guarded by backfillMtx; the map is created lazily. backfillRunMtx
+	// serializes the scan goroutines themselves so only one backfill
+	// batch-scans at a time.
+	backfillMtx    sync.Mutex
+	backfillRunMtx sync.Mutex
+	backfillJobs   map[string]*BackfillJobStatus
 
 	// Channel for transaction creation requests.
 	createTxRequests chan createTxRequest
