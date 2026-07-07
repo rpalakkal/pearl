@@ -55,6 +55,14 @@ function registerWalletIpc(ms: ManagerService) {
   ipcMain.handle('wallet-get-balance', (_event, account: string, minconf: number = 1) =>
     ms.ensureWalletService().getBalance(account, minconf)
   );
+  ipcMain.handle(
+    'wallet-list-unspent',
+    (_event, minconf: number = 1, maxconf: number = 9999999) =>
+      ms.ensureWalletService().listUnspent(minconf, maxconf)
+  );
+  ipcMain.handle('wallet-get-received-by-address', (_event, address: string) =>
+    ms.ensureWalletService().getReceivedByAddress(address)
+  );
   ipcMain.handle('wallet-validate-address', (_event, address: string) =>
     ms.ensureWalletService().validateAddress(address)
   );

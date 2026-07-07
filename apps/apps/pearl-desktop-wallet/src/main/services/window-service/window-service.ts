@@ -55,6 +55,12 @@ class WindowService implements WindowApi {
   openExternal(url: string) {
     shell.openExternal(url);
   }
+
+  // app.quit() runs the before-quit handler, so the wallet shuts down cleanly.
+  relaunch() {
+    app.relaunch();
+    app.quit();
+  }
   //   platform: process.platform;
   //   isElectron: true;
 }

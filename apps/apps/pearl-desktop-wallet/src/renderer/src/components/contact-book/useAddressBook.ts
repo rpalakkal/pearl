@@ -33,9 +33,12 @@ function listKnownHardwareAddresses(): KnownAddress[] {
     for (const vendor of HARDWARE_VENDORS) {
       for (const account of listStoredHardwareAccounts(normalizePearlNetwork(network), vendor)) {
         const networkSuffix = account.network === 'testnet' ? ' (testnet)' : '';
+        const accountName =
+          account.label?.trim() ||
+          `${getHardwareWalletProviderName(vendor)} address #${account.addressIndex}`;
         entries.push({
           address: account.address,
-          label: `Your ${getHardwareWalletProviderName(vendor)} address #${account.addressIndex}${networkSuffix}`,
+          label: `Your ${accountName}${networkSuffix}`,
           source: 'hardware',
         });
       }

@@ -17,43 +17,18 @@ export interface HardwareWalletAccountStorage {
   removeItem(key: string): void;
 }
 
-export interface HardwareAddressSelectorOption {
-  addressIndex: number;
-  account: HardwareWalletAddress | null;
+// A remembered hardware account plus renderer-only metadata. The wallet-core
+// HardwareWalletAddress stays label-free; signing code never needs it.
+export interface StoredHardwareAccount extends HardwareWalletAddress {
+  label?: string;
 }
 
-const hardwareAccountStoragePrefix = 'pearl.hardwareWalletAccount.v1';
+export const HARDWARE_ACCOUNT_LABEL_MAX_LENGTH = 64;
 
-export function getHardwareAddressSelectorOptions(
-  rememberedAccounts: HardwareWalletAddress[],
-  activeAccount: HardwareWalletAddress | null,
-  selectedVendor: HardwareWalletVendor,
-  selectedNetwork: ReturnType<typeof normalizePearlNetwork>,
-  selectedAddressIndex: number
-): HardwareAddressSelectorOption[] {
-  const accountsByIndex = new Map<number, HardwareWalletAddress>();
-
-  for (const account of rememberedAccounts) {
-    accountsByIndex.set(account.addressIndex, account);
-  }
-
-  if (
-    activeAccount &&
-    activeAccount.vendor === selectedVendor &&
-    activeAccount.network === selectedNetwork
-  ) {
-    accountsByIndex.set(activeAccount.addressIndex, activeAccount);
-  }
-
-  const indexes = new Set([...accountsByIndex.keys(), selectedAddressIndex]);
-
-  return [...indexes]
-    .sort((left, right) => left - right)
-    .map(addressIndex => ({
-      addressIndex,
-      account: accountsByIndex.get(addressIndex) ?? null,
-    }));
-}
+// Records are keyed by network.vendor.address — the address is derived from
+// the device public key, so accounts from two same-vendor devices coexist
+// even at the same address index. (v1 keyed by index and collided.)
+const hardwareAccountStoragePrefix = 'pearl.hardwareWalletAccount.v2';
 
 export function getNextHardwareWalletAddressIndex(
   accounts: HardwareWalletAddress[]
@@ -91,160 +66,123 @@ export function listStoredHardwareAccounts(
   network: ReturnType<typeof normalizePearlNetwork>,
   vendor: HardwareWalletVendor,
   storage: HardwareWalletAccountStorage = getDefaultHardwareWalletStorage()
-): HardwareWalletAddress[] {
-  const accounts = new Map<number, HardwareWalletAddress>();
+): StoredHardwareAccount[] {
+  const accounts = new Map<string, StoredHardwareAccount>();
   const keyPrefix = `${hardwareAccountStoragePrefix}.${network}.${vendor}.`;
 
   try {
-    for (let index = 0; index < storage.length; index += 1) {
-      const key = storage.key(index);
-
-      if (!key?.startsWith(keyPrefix)) {
+    for (const key of listStorageKeys(storage)) {
+      if (!key.startsWith(keyPrefix)) {
         continue;
       }
 
-      const addressIndexText = key.slice(keyPrefix.length);
-
-      if (!/^\d+$/.test(addressIndexText)) {
-        continue;
-      }
-
+      const address = key.slice(keyPrefix.length);
       const rawAccount = storage.getItem(key);
 
-      if (!rawAccount) {
+      if (!address || !rawAccount) {
         continue;
       }
 
-      const addressIndex = normalizeHardwareWalletAddressIndex(addressIndexText);
-      const account = parseStoredHardwareAccount(
-        JSON.parse(rawAccount) as unknown,
-        network,
-        vendor,
-        addressIndex
-      );
-
-      if (account) {
-        accounts.set(account.addressIndex, account);
+      // A corrupt record only hides itself, not the rest of the scan.
+      let account: StoredHardwareAccount | null = null;
+      try {
+        account = parseStoredHardwareAccount(JSON.parse(rawAccount) as unknown, network, vendor);
+      } catch {
+        console.warn(`Ignoring unreadable hardware account record: ${key}`);
       }
-    }
 
-    if (!accounts.has(DEFAULT_HARDWARE_WALLET_ADDRESS_INDEX)) {
-      const legacyRawAccount = storage.getItem(legacyStorageKeyForHardwareAccount(network, vendor));
-
-      if (legacyRawAccount) {
-        const legacyAccount = parseStoredHardwareAccount(
-          JSON.parse(legacyRawAccount) as unknown,
-          network,
-          vendor,
-          DEFAULT_HARDWARE_WALLET_ADDRESS_INDEX
-        );
-
-        if (legacyAccount) {
-          accounts.set(legacyAccount.addressIndex, legacyAccount);
-        }
+      if (account && account.address === address) {
+        accounts.set(account.address, account);
       }
     }
   } catch (error) {
     console.warn('Failed to list hardware wallet accounts:', error);
   }
 
-  return [...accounts.values()].sort((left, right) => left.addressIndex - right.addressIndex);
-}
-
-export function readStoredHardwareAccount(
-  network: ReturnType<typeof normalizePearlNetwork>,
-  vendor?: HardwareWalletVendor,
-  addressIndex?: number,
-  storage: HardwareWalletAccountStorage = getDefaultHardwareWalletStorage()
-): HardwareWalletAddress | null {
-  try {
-    const storedVendor = vendor ?? storage.getItem(lastVendorStorageKey(network));
-
-    if (!isHardwareWalletVendor(storedVendor)) {
-      return null;
-    }
-
-    const storedAddressIndex =
-      addressIndex ?? readLastHardwareWalletAddressIndex(network, storedVendor, storage);
-    const normalizedAddressIndex = normalizeHardwareWalletAddressIndex(storedAddressIndex);
-    const rawAccount =
-      storage.getItem(
-        storageKeyForHardwareAccount(network, storedVendor, normalizedAddressIndex)
-      ) ??
-      (normalizedAddressIndex === DEFAULT_HARDWARE_WALLET_ADDRESS_INDEX
-        ? storage.getItem(legacyStorageKeyForHardwareAccount(network, storedVendor))
-        : null);
-
-    if (!rawAccount) {
-      return null;
-    }
-
-    const parsedAccount = JSON.parse(rawAccount) as unknown;
-    return parseStoredHardwareAccount(parsedAccount, network, storedVendor, normalizedAddressIndex);
-  } catch (error) {
-    console.warn('Failed to restore hardware wallet account:', error);
-    return null;
-  }
-}
-
-export function saveLastHardwareWalletSelection(
-  network: string,
-  vendor: HardwareWalletVendor,
-  addressIndex: number,
-  storage: HardwareWalletAccountStorage = getDefaultHardwareWalletStorage()
-): void {
-  try {
-    const normalizedAddressIndex = normalizeHardwareWalletAddressIndex(addressIndex);
-    storage.setItem(lastVendorStorageKey(network), vendor);
-    storage.setItem(lastAddressIndexStorageKey(network, vendor), String(normalizedAddressIndex));
-  } catch (error) {
-    console.warn('Failed to remember hardware wallet selection:', error);
-  }
+  return [...accounts.values()].sort(
+    (left, right) =>
+      left.addressIndex - right.addressIndex || left.address.localeCompare(right.address)
+  );
 }
 
 export function saveStoredHardwareAccount(
-  account: HardwareWalletAddress,
+  account: StoredHardwareAccount,
   storage: HardwareWalletAccountStorage = getDefaultHardwareWalletStorage()
 ): void {
   try {
-    storage.setItem(
-      storageKeyForHardwareAccount(account.network, account.vendor, account.addressIndex),
-      JSON.stringify(account)
-    );
-    saveLastHardwareWalletSelection(account.network, account.vendor, account.addressIndex, storage);
+    const key = storageKeyForHardwareAccount(account.network, account.vendor, account.address);
+
+    // Reconnecting a known device must never wipe its user-given name.
+    let label = normalizeHardwareAccountLabel(account.label);
+    if (label === undefined) {
+      const rawExisting = storage.getItem(key);
+      const existing = rawExisting
+        ? parseStoredHardwareAccount(
+            JSON.parse(rawExisting) as unknown,
+            account.network,
+            account.vendor
+          )
+        : null;
+      label = existing?.label;
+    }
+
+    const record: StoredHardwareAccount = {
+      vendor: account.vendor,
+      network: account.network,
+      address: account.address,
+      path: account.path,
+      publicKey: account.publicKey,
+      addressIndex: account.addressIndex,
+      ...(label !== undefined ? {label} : {}),
+    };
+
+    storage.setItem(key, JSON.stringify(record));
   } catch (error) {
     console.warn('Failed to remember hardware wallet account:', error);
+  }
+}
+
+// Sets or clears (label = null / blank) the user-given account name. The
+// storage key and account id never include the label, so renames are
+// identity-stable.
+export function renameStoredHardwareAccount(
+  network: string,
+  vendor: HardwareWalletVendor,
+  address: string,
+  label: string | null,
+  storage: HardwareWalletAccountStorage = getDefaultHardwareWalletStorage()
+): void {
+  try {
+    const key = storageKeyForHardwareAccount(network, vendor, address);
+    const rawAccount = storage.getItem(key);
+
+    if (!rawAccount) {
+      return;
+    }
+
+    const account = JSON.parse(rawAccount) as Record<string, unknown>;
+    const normalizedLabel = normalizeHardwareAccountLabel(label ?? undefined);
+
+    if (normalizedLabel === undefined) {
+      delete account.label;
+    } else {
+      account.label = normalizedLabel;
+    }
+
+    storage.setItem(key, JSON.stringify(account));
+  } catch (error) {
+    console.warn('Failed to rename hardware wallet account:', error);
   }
 }
 
 export function forgetStoredHardwareAccount(
   network: string,
   vendor: HardwareWalletVendor,
-  addressIndex: number,
+  address: string,
   storage: HardwareWalletAccountStorage = getDefaultHardwareWalletStorage()
 ): void {
   try {
-    const normalizedAddressIndex = normalizeHardwareWalletAddressIndex(addressIndex);
-    storage.removeItem(storageKeyForHardwareAccount(network, vendor, normalizedAddressIndex));
-
-    if (normalizedAddressIndex === DEFAULT_HARDWARE_WALLET_ADDRESS_INDEX) {
-      storage.removeItem(legacyStorageKeyForHardwareAccount(network, vendor));
-    }
-
-    const lastVendor = storage.getItem(lastVendorStorageKey(network));
-    const lastAddressIndex = storage.getItem(lastAddressIndexStorageKey(network, vendor));
-    const isLastAddressIndex =
-      lastAddressIndex === String(normalizedAddressIndex) ||
-      (lastAddressIndex === null &&
-        normalizedAddressIndex === DEFAULT_HARDWARE_WALLET_ADDRESS_INDEX);
-
-    if (isLastAddressIndex) {
-      storage.removeItem(lastAddressIndexStorageKey(network, vendor));
-    }
-
-    if (lastVendor === vendor && isLastAddressIndex) {
-      storage.removeItem(lastVendorStorageKey(network));
-    }
+    storage.removeItem(storageKeyForHardwareAccount(network, vendor, address));
   } catch (error) {
     console.warn('Failed to forget hardware wallet account:', error);
   }
@@ -253,48 +191,44 @@ export function forgetStoredHardwareAccount(
 function storageKeyForHardwareAccount(
   network: string,
   vendor: HardwareWalletVendor,
-  addressIndex: number
+  address: string
 ): string {
-  return `${hardwareAccountStoragePrefix}.${network}.${vendor}.${addressIndex}`;
+  return `${hardwareAccountStoragePrefix}.${network}.${vendor}.${address}`;
 }
 
-function legacyStorageKeyForHardwareAccount(network: string, vendor: HardwareWalletVendor): string {
-  return `${hardwareAccountStoragePrefix}.${network}.${vendor}`;
-}
+function listStorageKeys(storage: HardwareWalletAccountStorage): string[] {
+  const keys: string[] = [];
 
-function lastVendorStorageKey(network: string): string {
-  return `${hardwareAccountStoragePrefix}.${network}.lastVendor`;
-}
+  for (let index = 0; index < storage.length; index += 1) {
+    const key = storage.key(index);
 
-function lastAddressIndexStorageKey(network: string, vendor: HardwareWalletVendor): string {
-  return `${hardwareAccountStoragePrefix}.${network}.${vendor}.lastAddressIndex`;
-}
-
-function readLastHardwareWalletAddressIndex(
-  network: ReturnType<typeof normalizePearlNetwork>,
-  vendor: HardwareWalletVendor,
-  storage: HardwareWalletAccountStorage
-): number {
-  const rawAddressIndex = storage.getItem(lastAddressIndexStorageKey(network, vendor));
-
-  if (rawAddressIndex === null) {
-    return DEFAULT_HARDWARE_WALLET_ADDRESS_INDEX;
+    if (key !== null) {
+      keys.push(key);
+    }
   }
 
-  return normalizeHardwareWalletAddressIndex(rawAddressIndex);
+  return keys;
+}
+
+function normalizeHardwareAccountLabel(label: unknown): string | undefined {
+  if (typeof label !== 'string') {
+    return undefined;
+  }
+
+  const trimmed = label.trim().slice(0, HARDWARE_ACCOUNT_LABEL_MAX_LENGTH);
+  return trimmed ? trimmed : undefined;
 }
 
 function parseStoredHardwareAccount(
   value: unknown,
   network: ReturnType<typeof normalizePearlNetwork>,
-  vendor: HardwareWalletVendor,
-  expectedAddressIndex: number
-): HardwareWalletAddress | null {
+  vendor: HardwareWalletVendor
+): StoredHardwareAccount | null {
   if (!value || typeof value !== 'object') {
     return null;
   }
 
-  const account = value as Partial<HardwareWalletAddress>;
+  const account = value as Partial<StoredHardwareAccount>;
 
   if (
     account.vendor !== vendor ||
@@ -316,17 +250,15 @@ function parseStoredHardwareAccount(
     return null;
   }
 
-  if (addressIndex !== expectedAddressIndex) {
-    return null;
-  }
-
-  const parsedAccount: HardwareWalletAddress = {
+  const label = normalizeHardwareAccountLabel(account.label);
+  const parsedAccount: StoredHardwareAccount = {
     vendor,
     network,
     address: account.address,
     path: account.path,
     publicKey: account.publicKey,
     addressIndex,
+    ...(label !== undefined ? {label} : {}),
   };
 
   try {
@@ -336,10 +268,6 @@ function parseStoredHardwareAccount(
   }
 
   return parsedAccount;
-}
-
-function isHardwareWalletVendor(value: unknown): value is HardwareWalletVendor {
-  return value === 'ledger' || value === 'trezor';
 }
 
 function getDefaultHardwareWalletStorage(): HardwareWalletAccountStorage {

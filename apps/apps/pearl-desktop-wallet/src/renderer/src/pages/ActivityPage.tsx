@@ -1,10 +1,12 @@
-import {ArrowLeft, ArrowUpRight, ArrowDownLeft, Copy, Check} from 'lucide-react';
+import {ArrowLeft, ArrowUpRight, ArrowDownLeft, ExternalLink} from 'lucide-react';
 import {Transaction} from '../../../types/transaction';
 import {usePagination} from '../hooks/usePagination';
 import {useHardwareActivity} from '../hooks/hardware/useHardwareActivity';
 import {useActiveAccount} from '../store/accountsStore';
 import {Button} from '@/components/ui/button';
-import {useEffect, useRef, useState} from 'react';
+import {CopyButton} from '@/components/ui/copy-button';
+import {explorerTxUrl} from '../lib/explorer';
+import {useEffect, useRef} from 'react';
 
 interface ActivityPageProps {
   onBack: () => void;
@@ -40,10 +42,9 @@ const truncateTxId = (txid: string): string => {
 export default function ActivityPage({onBack}: ActivityPageProps) {
   const active = useActiveAccount();
   const isHardware = active?.kind === 'hardware';
-  const software = usePagination({pageSize: 25, enabled: !isHardware});
+  const software = usePagination({pageSize: 25, enabled: !isHardware, resetKey: active?.id ?? null});
   const hardware = useHardwareActivity(isHardware ? active : null);
   const {activities, loading, hasMore, loadMore} = isHardware ? hardware : software;
-  const [copiedTxId, setCopiedTxId] = useState<string | null>(null);
 
   // Infinite scroll: auto-load the next page when the sentinel at the list's
   // end scrolls into view. The Load More button stays as a manual fallback.
@@ -65,16 +66,6 @@ export default function ActivityPage({onBack}: ActivityPageProps) {
     observer.observe(sentinel);
     return () => observer.disconnect();
   }, [canAutoLoad]);
-
-  const handleCopyTxId = async (txid: string) => {
-    try {
-      await navigator.clipboard.writeText(txid);
-      setCopiedTxId(txid);
-      setTimeout(() => setCopiedTxId(null), 2000);
-    } catch (err) {
-      console.error('Failed to copy transaction ID:', err);
-    }
-  };
 
   return (
     <div className="flex h-screen w-full flex-col bg-transparent">
@@ -139,16 +130,20 @@ export default function ActivityPage({onBack}: ActivityPageProps) {
                         <span className="text-xs text-gray-500">
                           Tx ID: {truncateTxId(activity.txid)}
                         </span>
-                        <button
-                          onClick={() => handleCopyTxId(activity.txid)}
-                          className="rounded p-1 transition-colors hover:bg-gray-100"
+                        <CopyButton
+                          value={activity.txid}
+                          className="rounded p-1"
+                          iconClassName="h-3 w-3"
                           title="Copy transaction ID"
+                        />
+                        <button
+                          onClick={() =>
+                            window.appBridge.window.openExternal(explorerTxUrl(activity.txid))
+                          }
+                          className="rounded p-1 transition-colors hover:bg-gray-100"
+                          title="View on prlscan.com"
                         >
-                          {copiedTxId === activity.txid ? (
-                            <Check className="text-brand-green h-3 w-3" />
-                          ) : (
-                            <Copy className="h-3 w-3 text-gray-400" />
-                          )}
+                          <ExternalLink className="h-3 w-3 text-gray-400" />
                         </button>
                       </div>
                     </div>

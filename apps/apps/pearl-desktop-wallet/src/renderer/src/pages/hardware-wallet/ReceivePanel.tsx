@@ -1,6 +1,7 @@
 import {CheckCircle2, Copy, Loader2} from 'lucide-react';
 import {QrcodeCanvas} from 'react-qrcode-pretty';
 import {Button} from '@/components/ui/button';
+import {Bech32Address} from '@/components/ui/bech32-address';
 import type {HardwareWalletReceiveModel, HardwareWalletViewActions} from './viewModel.ts';
 
 export function ReceivePanel({
@@ -30,7 +31,7 @@ export function ReceivePanel({
         <div className="text-sm font-medium text-gray-700">Receive Address</div>
         <div className="flex items-start gap-3 rounded-lg border border-gray-200 bg-gray-50 p-3">
           <div className="min-w-0 flex-1 break-all font-mono text-sm text-gray-900">
-            {model.hardwareAddress.address}
+            <Bech32Address address={model.hardwareAddress.address} />
           </div>
           <button
             type="button"
@@ -47,7 +48,9 @@ export function ReceivePanel({
         {model.receiveDeviceDisplayAddress && (
           <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900">
             <div className="mb-1 font-medium">Expected device display address</div>
-            <div className="break-all font-mono">{model.receiveDeviceDisplayAddress}</div>
+            <div className="break-all font-mono">
+              <Bech32Address address={model.receiveDeviceDisplayAddress} />
+            </div>
           </div>
         )}
         <Button
@@ -72,7 +75,9 @@ export function ReceivePanel({
         {model.verifiedDeviceAddress && (
           <div className="rounded-lg border border-green-200 bg-green-50 p-3 text-xs text-green-800">
             <div className="mb-1 font-medium">Verified device display address</div>
-            <div className="break-all font-mono">{model.verifiedDeviceAddress}</div>
+            <div className="break-all font-mono">
+              <Bech32Address address={model.verifiedDeviceAddress} />
+            </div>
           </div>
         )}
         {model.verifyError && (

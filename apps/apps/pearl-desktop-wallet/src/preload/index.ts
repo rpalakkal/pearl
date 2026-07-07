@@ -24,6 +24,7 @@ const windowIpc: Ipc<WindowApi> = {
   showOpenDialog: options => ipcRenderer.invoke('show-open-dialog', options),
   showSaveDialog: options => ipcRenderer.invoke('show-save-dialog', options),
   openExternal: url => ipcRenderer.invoke('open-external', url),
+  relaunch: () => ipcRenderer.invoke('app-relaunch'),
 };
 
 const walletIpc: Ipc<WalletApi> = {
@@ -38,6 +39,8 @@ const walletIpc: Ipc<WalletApi> = {
   listAllTransactions: () => ipcRenderer.invoke('wallet-list-all-transactions'),
   listTransactions: (count, from) => ipcRenderer.invoke('wallet-list-transactions', count, from),
   getBalance: (account, minconf) => ipcRenderer.invoke('wallet-get-balance', account, minconf),
+  listUnspent: (minconf, maxconf) => ipcRenderer.invoke('wallet-list-unspent', minconf, maxconf),
+  getReceivedByAddress: address => ipcRenderer.invoke('wallet-get-received-by-address', address),
   validateAddress: address => ipcRenderer.invoke('wallet-validate-address', address),
   getAddressesByAccount: account => ipcRenderer.invoke('wallet-get-addresses-by-account', account),
   estimateFee: (numBlocks, network) =>

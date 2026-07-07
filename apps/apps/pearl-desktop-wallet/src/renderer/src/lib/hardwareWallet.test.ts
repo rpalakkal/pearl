@@ -28,13 +28,13 @@ import {
 } from './hardwareWalletTestFixtures.ts';
 import {
   forgetStoredHardwareAccount,
-  getHardwareAddressSelectorOptions,
   getNextHardwareWalletAddressIndex,
   listStoredHardwareAccounts,
-  readStoredHardwareAccount,
+  renameStoredHardwareAccount,
   saveStoredHardwareAccount,
   type HardwareWalletAccountStorage,
 } from './hardwareWalletStorage.ts';
+import {hardwareAccountId} from './accounts.ts';
 import {
   getHardwareBalanceSats,
   getHardwareUtxoValue,
@@ -154,10 +154,20 @@ test('rejects inconsistent stored hardware account metadata before planning', ()
   );
 });
 
-test('stores and restores hardware wallet accounts by vendor, network, and address index', () => {
+// A second physical device: a different key at the same vendor/network/index.
+const secondDevicePublicKey =
+  '02c6047f9441ed7d6d3045406e95c07cd85c778e4b8cef3ca7abac09b95c709ee5';
+const secondDeviceAccount: HardwareWalletAddress = {
+  ...account,
+  address: derivePearlTaprootAddress(secondDevicePublicKey, 'mainnet'),
+  publicKey: secondDevicePublicKey,
+};
+
+test('stores and restores hardware wallet accounts by vendor, network, and address', () => {
   const storage = new MemoryStorage();
+  // A different index derives a different key on a real device.
   const ledgerAccount1: HardwareWalletAddress = {
-    ...account,
+    ...secondDeviceAccount,
     path: getPearlHardwareWalletPath('mainnet', 'ledger', 1),
     addressIndex: 1,
   };
@@ -179,17 +189,18 @@ test('stores and restores hardware wallet accounts by vendor, network, and addre
     ),
     [0, 1]
   );
-  assert.equal(
-    readStoredHardwareAccount('mainnet', 'ledger', 1, storage)?.path,
-    ledgerAccount1.path
+  assert.deepEqual(
+    listStoredHardwareAccounts('mainnet', 'trezor', storage).map(
+      storedAccount => storedAccount.vendor
+    ),
+    ['trezor']
   );
   assert.equal(
-    readStoredHardwareAccount('mainnet', undefined, undefined, storage)?.vendor,
-    'trezor'
+    listStoredHardwareAccounts('testnet', 'ledger', storage)[0]?.address,
+    testnetAddress
   );
-  assert.equal(readStoredHardwareAccount('testnet', 'ledger', 0, storage)?.address, testnetAddress);
 
-  forgetStoredHardwareAccount('mainnet', 'ledger', 1, storage);
+  forgetStoredHardwareAccount('mainnet', 'ledger', ledgerAccount1.address, storage);
 
   assert.deepEqual(
     listStoredHardwareAccounts('mainnet', 'ledger', storage).map(
@@ -197,64 +208,62 @@ test('stores and restores hardware wallet accounts by vendor, network, and addre
     ),
     [0]
   );
-  assert.equal(readStoredHardwareAccount('mainnet', 'ledger', 1, storage), null);
+
+  assert.equal(getNextHardwareWalletAddressIndex([account, ledgerAccount1]), 2);
 });
 
-test('migrates legacy index-zero hardware wallet storage without leaking it to other slots', () => {
+test('keeps accounts from two devices at the same vendor and address index', () => {
   const storage = new MemoryStorage();
-  const legacyAccount = {...account};
-  delete (legacyAccount as Partial<HardwareWalletAddress>).addressIndex;
 
-  storage.setItem('pearl.hardwareWalletAccount.v1.mainnet.ledger', JSON.stringify(legacyAccount));
-  storage.setItem('pearl.hardwareWalletAccount.v1.mainnet.lastVendor', 'ledger');
+  saveStoredHardwareAccount(account, storage);
+  saveStoredHardwareAccount(secondDeviceAccount, storage);
 
-  assert.equal(readStoredHardwareAccount('mainnet', 'ledger', 0, storage)?.addressIndex, 0);
-  assert.equal(readStoredHardwareAccount('mainnet', 'ledger', 1, storage), null);
-  assert.deepEqual(
-    listStoredHardwareAccounts('mainnet', 'ledger', storage).map(
-      storedAccount => storedAccount.addressIndex
-    ),
-    [0]
-  );
+  const stored = listStoredHardwareAccounts('mainnet', 'ledger', storage);
+  assert.equal(stored.length, 2);
+  assert.deepEqual(new Set(stored.map(entry => entry.address)), new Set([
+    account.address,
+    secondDeviceAccount.address,
+  ]));
+  assert.notEqual(hardwareAccountId(account), hardwareAccountId(secondDeviceAccount));
 });
 
-test('builds address selector options from remembered and active hardware accounts', () => {
-  const ledgerAccount2: HardwareWalletAddress = {
-    ...account,
-    path: getPearlHardwareWalletPath('mainnet', 'ledger', 2),
-    addressIndex: 2,
-  };
-  const activeLedgerAccount3: HardwareWalletAddress = {
-    ...account,
-    path: getPearlHardwareWalletPath('mainnet', 'ledger', 3),
-    addressIndex: 3,
-  };
+test('renames hardware accounts without changing their identity', () => {
+  const storage = new MemoryStorage();
+  saveStoredHardwareAccount(account, storage);
+
+  renameStoredHardwareAccount('mainnet', 'ledger', account.address, '  Cold Ledger  ', storage);
+  let [stored] = listStoredHardwareAccounts('mainnet', 'ledger', storage);
+  assert.equal(stored?.label, 'Cold Ledger');
+  assert.equal(hardwareAccountId(stored), hardwareAccountId(account));
+
+  // Reconnecting the same device (a plain save without label) keeps the name.
+  saveStoredHardwareAccount(account, storage);
+  [stored] = listStoredHardwareAccounts('mainnet', 'ledger', storage);
+  assert.equal(stored?.label, 'Cold Ledger');
+
+  renameStoredHardwareAccount('mainnet', 'ledger', account.address, null, storage);
+  [stored] = listStoredHardwareAccounts('mainnet', 'ledger', storage);
+  assert.equal(stored?.label, undefined);
+});
+
+test('ignores v1 index-keyed records and unreadable values', () => {
+  const storage = new MemoryStorage();
+
+  storage.setItem('pearl.hardwareWalletAccount.v1.mainnet.ledger', JSON.stringify(account));
+  storage.setItem('pearl.hardwareWalletAccount.v1.mainnet.ledger.0', JSON.stringify(account));
+  saveStoredHardwareAccount(secondDeviceAccount, storage);
+  storage.setItem(
+    `pearl.hardwareWalletAccount.v2.mainnet.trezor.${account.address}`,
+    'not-json{'
+  );
 
   assert.deepEqual(
-    getHardwareAddressSelectorOptions([account, ledgerAccount2], null, 'ledger', 'mainnet', 1).map(
-      option => [option.addressIndex, Boolean(option.account)]
+    listStoredHardwareAccounts('mainnet', 'ledger', storage).map(
+      storedAccount => storedAccount.address
     ),
-    [
-      [0, true],
-      [1, false],
-      [2, true],
-    ]
+    [secondDeviceAccount.address]
   );
-  assert.deepEqual(
-    getHardwareAddressSelectorOptions(
-      [account, ledgerAccount2],
-      activeLedgerAccount3,
-      'ledger',
-      'mainnet',
-      3
-    ).map(option => [option.addressIndex, Boolean(option.account)]),
-    [
-      [0, true],
-      [2, true],
-      [3, true],
-    ]
-  );
-  assert.equal(getNextHardwareWalletAddressIndex([account, ledgerAccount2]), 3);
+  assert.equal(listStoredHardwareAccounts('mainnet', 'trezor', storage).length, 0);
 });
 
 test('rejects signing with a device that does not match the stored hardware account', () => {

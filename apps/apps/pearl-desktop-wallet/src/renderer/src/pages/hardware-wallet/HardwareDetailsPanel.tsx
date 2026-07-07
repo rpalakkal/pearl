@@ -1,4 +1,6 @@
 import {Button} from '@/components/ui/button';
+import {CopyButton} from '@/components/ui/copy-button';
+import {Bech32Address} from '@/components/ui/bech32-address';
 import type {HardwareWalletDetailsModel, HardwareWalletViewActions} from './viewModel.ts';
 
 export function HardwareDetailsPanel({
@@ -24,7 +26,8 @@ export function HardwareDetailsPanel({
         <HardwareDetail label="Network" value={model.hardwareAddress.network} />
         <HardwareDetail label="Address Index" value={String(model.hardwareAddress.addressIndex)} />
         <HardwareDetail label="Path" value={model.hardwareAddress.path} />
-        <HardwareDetail label="Public Key" value={model.hardwareAddress.publicKey} />
+        <HardwareDetail label="Public Key" value={model.hardwareAddress.publicKey} copyable />
+        <HardwareDetail label="Address" value={model.hardwareAddress.address} copyable bech32 />
       </div>
 
       {model.isRememberedAccount && (
@@ -47,11 +50,26 @@ export function HardwareDetailsPanel({
   );
 }
 
-function HardwareDetail({label, value}: {label: string; value: string}) {
+function HardwareDetail({
+  label,
+  value,
+  copyable = false,
+  bech32 = false,
+}: {
+  label: string;
+  value: string;
+  copyable?: boolean;
+  bech32?: boolean;
+}) {
   return (
     <div className="min-w-0 rounded-lg border border-gray-200 bg-gray-50 p-3">
       <div className="mb-1 text-xs font-medium uppercase text-gray-500">{label}</div>
-      <div className="break-all font-mono text-xs text-gray-900">{value}</div>
+      <div className="flex items-start gap-2">
+        <div className="min-w-0 flex-1 break-all font-mono text-xs text-gray-900">
+          {bech32 ? <Bech32Address address={value} /> : value}
+        </div>
+        {copyable && <CopyButton value={value} className="p-1" iconClassName="h-4 w-4" />}
+      </div>
     </div>
   );
 }

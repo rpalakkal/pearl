@@ -11,8 +11,12 @@ import {
   resolveActiveAccount,
   softwareAccountId,
 } from './accounts.ts';
-import {account as ledgerFixture, trezorAccount} from './hardwareWalletTestFixtures.ts';
-import {saveStoredHardwareAccount, type HardwareWalletAccountStorage} from './hardwareWalletStorage.ts';
+import {account as ledgerFixture, mainnetAddress, trezorAccount} from './hardwareWalletTestFixtures.ts';
+import {
+  renameStoredHardwareAccount,
+  saveStoredHardwareAccount,
+  type HardwareWalletAccountStorage,
+} from './hardwareWalletStorage.ts';
 
 function makeFakeStorage(): HardwareWalletAccountStorage & {
   getItem(key: string): string | null;
@@ -40,14 +44,19 @@ function makeFakeStorage(): HardwareWalletAccountStorage & {
 
 test('account ids are stable and self-describing', () => {
   assert.equal(softwareAccountId('main'), 'software:main');
-  assert.equal(hardwareAccountId(ledgerFixture), 'hardware:mainnet:ledger:0');
+  assert.equal(hardwareAccountId(ledgerFixture), `hardware:mainnet:ledger:${mainnetAddress}`);
 });
 
 test('buildAccountList merges software and hardware accounts', () => {
   const accounts = buildAccountList(['a', 'b'], [ledgerFixture, trezorAccount]);
   assert.deepEqual(
     accounts.map(a => a.id),
-    ['software:a', 'software:b', 'hardware:mainnet:ledger:0', 'hardware:mainnet:trezor:0']
+    [
+      'software:a',
+      'software:b',
+      `hardware:mainnet:ledger:${mainnetAddress}`,
+      `hardware:mainnet:trezor:${mainnetAddress}`,
+    ]
   );
   assert.equal(accounts[2].kind, 'hardware');
   if (accounts[2].kind === 'hardware') {
@@ -70,13 +79,14 @@ test('enumerateHardwareAccounts reads both vendors from storage', () => {
 
 test('resolveActiveAccount prefers persisted, then software, then hardware', () => {
   const accounts = buildAccountList(['w1'], [ledgerFixture]);
+  const ledgerId = hardwareAccountId(ledgerFixture);
 
-  assert.equal(resolveActiveAccount(accounts, 'hardware:mainnet:ledger:0')?.id, 'hardware:mainnet:ledger:0');
+  assert.equal(resolveActiveAccount(accounts, ledgerId)?.id, ledgerId);
   assert.equal(resolveActiveAccount(accounts, 'software:gone')?.id, 'software:w1');
   assert.equal(resolveActiveAccount(accounts, null)?.id, 'software:w1');
 
   const hardwareOnly = buildAccountList([], [ledgerFixture]);
-  assert.equal(resolveActiveAccount(hardwareOnly, null)?.id, 'hardware:mainnet:ledger:0');
+  assert.equal(resolveActiveAccount(hardwareOnly, null)?.id, ledgerId);
   assert.equal(resolveActiveAccount([], null), null);
 });
 
@@ -90,8 +100,23 @@ test('active account persistence is scoped per network', () => {
   assert.equal(activeAccountStorageKey('mainnet'), 'pearl.activeAccount.v1.mainnet');
 });
 
-test('accountDisplayName labels both kinds', () => {
+test('accountDisplayName labels both kinds and prefers user-given labels', () => {
   const [software, hardware] = buildAccountList(['main'], [ledgerFixture]);
   assert.equal(accountDisplayName(software), 'main');
   assert.equal(accountDisplayName(hardware), 'Ledger #0');
+
+  const [named] = buildAccountList([], [{...ledgerFixture, label: 'Cold Ledger'}]);
+  assert.equal(accountDisplayName(named), 'Cold Ledger');
+  const [blankLabel] = buildAccountList([], [{...ledgerFixture, label: '   '}]);
+  assert.equal(accountDisplayName(blankLabel), 'Ledger #0');
+});
+
+test('renamed hardware accounts surface their label after a storage round-trip', () => {
+  const storage = makeFakeStorage();
+  saveStoredHardwareAccount(ledgerFixture, storage);
+  renameStoredHardwareAccount('mainnet', 'ledger', ledgerFixture.address, 'Vault', storage);
+
+  const [stored] = enumerateHardwareAccounts('mainnet', storage);
+  assert.equal(stored?.label, 'Vault');
+  assert.equal(hardwareAccountId(stored), hardwareAccountId(ledgerFixture));
 });

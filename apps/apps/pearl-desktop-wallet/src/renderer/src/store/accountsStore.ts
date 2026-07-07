@@ -8,7 +8,6 @@ import {
   type WalletAccount,
 } from '../lib/accounts';
 import {normalizePearlNetwork, type PearlNetwork} from '../lib/hardwareWallet';
-import {saveLastHardwareWalletSelection} from '../lib/hardwareWalletStorage';
 import {useWalletStore} from './walletStore';
 import {getErrorMessage} from '../lib/utils';
 
@@ -84,9 +83,7 @@ export const useAccountsStore = create<AccountsState>()((set, get) => ({
 
     if (account.kind === 'hardware') {
       // Instant: no process change. Any running software wallet keeps serving
-      // local reads for the hardware address. Remember the selection so the
-      // hardware page (until fully unified) restores this account.
-      saveLastHardwareWalletSelection(account.network, account.vendor, account.addressIndex);
+      // local reads for the hardware address.
       persistActiveAccountId(network, id);
       set({activeAccountId: id});
       return;

@@ -5,9 +5,13 @@ import type {
   HardwareWalletVendor,
   PearlNetwork,
 } from '../../lib/hardwareWallet.ts';
-import type {HardwareAddressSelectorOption} from '../../lib/hardwareWalletStorage.ts';
 import type {AddressBackfillStatus} from '../../../../types/app-bridge.ts';
 import type {HardwareSendStage} from './useHardwareSendFormState.ts';
+
+export interface HardwareAddressSelectorOption {
+  addressIndex: number;
+  account: HardwareWalletAddress | null;
+}
 
 export type SendPreviewState =
   | {preview: HardwarePearlSendPreview; error: null}

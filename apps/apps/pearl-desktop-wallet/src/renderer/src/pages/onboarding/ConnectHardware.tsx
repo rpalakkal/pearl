@@ -155,7 +155,8 @@ export default function ConnectHardware() {
               Derivation path <span className="font-mono">{derivationPath}</span>
               {rememberedIndexes.has(addressIndex) && (
                 <span className="ml-1 text-amber-700">
-                  — this index is already added; connecting re-verifies it.
+                  — this index is already added for a device; reconnecting the same device
+                  re-verifies it, a different device is added as a new account.
                 </span>
               )}
             </div>

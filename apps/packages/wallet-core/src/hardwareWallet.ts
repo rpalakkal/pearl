@@ -57,7 +57,9 @@ export {
   buildLedgerSignPsbtOptions,
   buildPearlSendPlan,
   buildTrezorSignTransactionPayload,
+  estimateTaprootFeeSats,
   isConfirmedHardwareUtxo,
+  maxSpendableHardwareSendSats,
   previewHardwarePearlSend,
   validateSignedHardwareTransaction,
 } from './hardware-wallet/transactions.ts';

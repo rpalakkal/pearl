@@ -1,15 +1,16 @@
 import { useState, useEffect } from 'react';
-import { ArrowLeft, Copy, CheckCircle2, AlertTriangle } from 'lucide-react';
+import { ArrowLeft, AlertTriangle } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useWalletStore } from '../store/walletStore';
 import { QrcodeCanvas } from 'react-qrcode-pretty';
+import { CopyButton } from '@/components/ui/copy-button';
+import { Bech32Address } from '@/components/ui/bech32-address';
 
 export default function ReceiveTransaction() {
   const navigate = useNavigate();
   const { walletName } = useWalletStore();
   const [receiveAddress, setReceiveAddress] = useState<string>('');
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const [copiedAddress, setCopiedAddress] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
   const fetchReceiveAddress = async () => {
@@ -29,16 +30,6 @@ export default function ReceiveTransaction() {
       setErrorMessage(message);
     } finally {
       setIsLoading(false);
-    }
-  };
-
-  const copyToClipboard = async (text: string) => {
-    try {
-      await navigator.clipboard.writeText(text);
-      setCopiedAddress(text);
-      setTimeout(() => setCopiedAddress(null), 2000);
-    } catch (err) {
-      console.error('Failed to copy to clipboard:', err);
     }
   };
 
@@ -113,20 +104,9 @@ export default function ReceiveTransaction() {
                 <div className="mb-2 text-sm text-gray-600">Your Receive Address</div>
                 <div className="flex items-center justify-between gap-3">
                   <div className="min-w-0 flex-1">
-                    <div className="break-all font-mono text-sm text-gray-900">
-                      {receiveAddress}
-                    </div>
+                    <Bech32Address address={receiveAddress} className="text-sm text-gray-900" />
                   </div>
-                  <button
-                    onClick={() => copyToClipboard(receiveAddress)}
-                    className="flex-shrink-0 rounded-lg p-2 transition-colors hover:bg-gray-100"
-                  >
-                    {copiedAddress === receiveAddress ? (
-                      <CheckCircle2 className="text-brand-green h-5 w-5" />
-                    ) : (
-                      <Copy className="h-5 w-5 text-gray-600" />
-                    )}
-                  </button>
+                  <CopyButton value={receiveAddress} className="rounded-lg p-2" />
                 </div>
               </div>
 

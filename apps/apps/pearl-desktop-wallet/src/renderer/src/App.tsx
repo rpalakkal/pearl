@@ -15,6 +15,7 @@ import AppShell from './components/app-shell/AppShell';
 import {useNavigate} from 'react-router-dom';
 import {SyncWallet} from './SyncWallet';
 import {MajorUpgradeBanner} from './components/MajorUpgradeBanner';
+import {Toaster} from '@/components/ui/toaster';
 import './App.css';
 
 function AppContent() {
@@ -66,6 +67,7 @@ function App() {
     <Router>
       <SyncWallet />
       <AppContent />
+      <Toaster />
     </Router>
   );
 }

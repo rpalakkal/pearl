@@ -1,5 +1,6 @@
 import {History, Loader2, PenLine, Send, UserRound, X} from 'lucide-react';
 import {Button} from '@/components/ui/button';
+import {Bech32Address} from '@/components/ui/bech32-address';
 import {formatSatsAsPearl} from '../../lib/hardwareWallet.ts';
 import {satsToPearlInput} from '../../lib/sendGate.ts';
 import {AddressBookControl} from '../../components/contact-book/AddressBookControl.tsx';
@@ -64,6 +65,7 @@ export function HardwareSendPanel({
           <SignedStage
             actions={actions}
             isBroadcasting={stage.step === 'broadcasting'}
+            recipient={stage.recipient}
             snapshot={stage.snapshot}
           />
         )}
@@ -238,7 +240,7 @@ function ReviewStage({
       <div className="rounded-lg border border-gray-200 bg-white p-3">
         <div className="mb-1 text-xs font-medium uppercase text-gray-500">Recipient</div>
         <div className="break-all font-mono text-sm text-gray-900">
-          {review.destinationAddress}
+          <Bech32Address address={review.destinationAddress} />
         </div>
         <RecipientRecognition recipient={recipient} />
         <div className="mt-2">
@@ -248,7 +250,9 @@ function ReviewStage({
 
       <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900">
         <div className="mb-1 font-medium">Your {connectedLabel} will display this address</div>
-        <div className="break-all font-mono">{review.preview.deviceDisplayAddress}</div>
+        <div className="break-all font-mono">
+          <Bech32Address address={review.preview.deviceDisplayAddress} />
+        </div>
       </div>
 
       <div className="grid gap-2 text-xs sm:grid-cols-2">
@@ -328,10 +332,12 @@ function ReviewStage({
 function SignedStage({
   actions,
   isBroadcasting,
+  recipient,
   snapshot,
 }: {
   actions: SendPanelActions;
   isBroadcasting: boolean;
+  recipient: RecipientContext;
   snapshot: HardwareSendSignedSnapshot;
 }) {
   return (
@@ -346,8 +352,9 @@ function SignedStage({
       <div className="rounded-lg border border-gray-200 bg-white p-3">
         <div className="mb-1 text-xs font-medium uppercase text-gray-500">Recipient</div>
         <div className="break-all font-mono text-sm text-gray-900">
-          {snapshot.review.destinationAddress}
+          <Bech32Address address={snapshot.review.destinationAddress} />
         </div>
+        <RecipientRecognition recipient={recipient} />
       </div>
 
       <div className="grid gap-2 text-xs sm:grid-cols-2">

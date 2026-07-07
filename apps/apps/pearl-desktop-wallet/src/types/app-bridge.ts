@@ -31,6 +31,7 @@ interface WindowApi {
   showOpenDialog: (options: OpenDialogOptions) => Promise<OpenDialogReturnValue>;
   showSaveDialog: (options: SaveDialogOptions) => Promise<SaveDialogReturnValue>;
   openExternal: (url: string) => void;
+  relaunch: () => void;
 }
 
 // Progress of an explicit address backfill rescan (rescanaddress RPC). Job
@@ -43,6 +44,16 @@ interface AddressBackfillStatus {
   currentHeight: number;
   targetHeight: number;
   error?: string;
+}
+
+// Subset of the wallet RPC's listunspent result that the renderer needs for
+// client-side fee/spendable estimation.
+interface WalletUnspentOutput {
+  txid: string;
+  vout: number;
+  amount: number;
+  confirmations: number;
+  spendable: boolean;
 }
 
 interface WalletApi {
@@ -63,6 +74,10 @@ interface WalletApi {
   listTransactions: (count?: number, from?: number) => Promise<Transaction[]>;
 
   getBalance: (account?: string, minconf?: number) => Promise<number>;
+
+  listUnspent: (minconf?: number, maxconf?: number) => Promise<WalletUnspentOutput[]>;
+
+  getReceivedByAddress: (address: string) => Promise<number>;
 
   validateAddress: (address: string) => Promise<{isValid: boolean}>;
 
@@ -329,6 +344,7 @@ export type {
   AppBridge,
   WindowApi,
   WalletApi,
+  WalletUnspentOutput,
   AddressBackfillStatus,
   HardwareWalletApi,
   HardwareBalanceSource,

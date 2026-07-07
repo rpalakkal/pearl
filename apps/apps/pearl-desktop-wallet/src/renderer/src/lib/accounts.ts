@@ -2,29 +2,36 @@
  * Unified account model: seed-based software wallets and hardware accounts
  * presented as one list. Pure helpers here; live state in accountsStore.
  */
-import {listStoredHardwareAccounts, type HardwareWalletAccountStorage} from './hardwareWalletStorage.ts';
-import type {HardwareWalletAddress, PearlNetwork} from './hardwareWallet.ts';
+import {
+  listStoredHardwareAccounts,
+  type HardwareWalletAccountStorage,
+  type StoredHardwareAccount,
+} from './hardwareWalletStorage.ts';
+import type {PearlNetwork} from './hardwareWallet.ts';
 
 export type WalletAccount =
   | {kind: 'software'; id: string; name: string}
-  | ({kind: 'hardware'; id: string} & HardwareWalletAddress);
+  | ({kind: 'hardware'; id: string} & StoredHardwareAccount);
 
 export function softwareAccountId(name: string): string {
   return `software:${name}`;
 }
 
+// The address is derived from the device public key, so it uniquely
+// identifies a physical device + network + address index. Keying the id by
+// address (not index) lets accounts from two same-vendor devices coexist.
 export function hardwareAccountId(account: {
   network: string;
   vendor: string;
-  addressIndex: number;
+  address: string;
 }): string {
-  return `hardware:${account.network}:${account.vendor}:${account.addressIndex}`;
+  return `hardware:${account.network}:${account.vendor}:${account.address}`;
 }
 
 export function enumerateHardwareAccounts(
   network: PearlNetwork,
   storage?: HardwareWalletAccountStorage
-): HardwareWalletAddress[] {
+): StoredHardwareAccount[] {
   return [
     ...listStoredHardwareAccounts(network, 'ledger', storage),
     ...listStoredHardwareAccounts(network, 'trezor', storage),
@@ -33,7 +40,7 @@ export function enumerateHardwareAccounts(
 
 export function buildAccountList(
   walletNames: string[],
-  hardwareAccounts: HardwareWalletAddress[]
+  hardwareAccounts: StoredHardwareAccount[]
 ): WalletAccount[] {
   return [
     ...walletNames.map(name => ({
@@ -101,6 +108,17 @@ export function accountDisplayName(account: WalletAccount): string {
   if (account.kind === 'software') {
     return account.name;
   }
+  const label = account.label?.trim();
+  if (label) {
+    return label;
+  }
+  return defaultHardwareAccountName(account);
+}
+
+export function defaultHardwareAccountName(account: {
+  vendor: string;
+  addressIndex: number;
+}): string {
   const vendorLabel = account.vendor === 'ledger' ? 'Ledger' : 'Trezor';
   return `${vendorLabel} #${account.addressIndex}`;
 }

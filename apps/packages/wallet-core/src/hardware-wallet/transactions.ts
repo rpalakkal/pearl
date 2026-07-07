@@ -369,6 +369,34 @@ export function parseUtxoValue(utxo: HardwareWalletUtxo): bigint {
   return parseSatsValue(utxo.value, 'UTXO value');
 }
 
+// Upper bound on a single send: every confirmed spendable UTXO as an input
+// and one output (no change). Returns 0n when the fee would eat the balance.
+export function maxSpendableHardwareSendSats(
+  utxos: HardwareWalletUtxo[],
+  feeRatePrlPerKb: number
+): bigint {
+  if (!Number.isFinite(feeRatePrlPerKb) || feeRatePrlPerKb <= 0) {
+    return 0n;
+  }
+
+  const spendable = utxos.filter(utxo => {
+    try {
+      validateUtxo(utxo);
+    } catch {
+      return false;
+    }
+    return isConfirmedHardwareUtxo(utxo) && parseUtxoValue(utxo) > 0n;
+  });
+
+  if (spendable.length === 0) {
+    return 0n;
+  }
+
+  const totalSats = spendable.reduce((total, utxo) => total + parseUtxoValue(utxo), 0n);
+  const feeSats = estimateTaprootFeeSats(spendable.length, 1, feeRatePrlPerKb);
+  return totalSats > feeSats ? totalSats - feeSats : 0n;
+}
+
 function selectUtxosForSend(
   utxos: HardwareWalletUtxo[],
   amountSats: bigint,
@@ -438,7 +466,7 @@ function selectUtxosForSend(
   throw new Error('Insufficient hardware wallet balance for amount plus network fee.');
 }
 
-function estimateTaprootFeeSats(
+export function estimateTaprootFeeSats(
   inputCount: number,
   outputCount: number,
   feeRatePrlPerKb: number
