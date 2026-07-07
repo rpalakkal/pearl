@@ -147,7 +147,7 @@ export function AccountSwitcher() {
       {isOpen && (
         <>
           <div className="fixed inset-0 z-20" onClick={() => setIsOpen(false)} />
-          <div className="absolute left-0 top-full z-30 mt-2 max-h-[70vh] w-72 overflow-y-auto rounded-lg border border-gray-300 bg-white py-2 shadow-lg">
+          <div className="absolute left-0 top-full z-30 mt-2 max-h-[70vh] w-80 overflow-y-auto rounded-lg border border-gray-300 bg-white py-2 shadow-lg">
             {softwareAccounts.length > 0 && (
               <div>
                 <div className="px-4 py-1 text-xs font-semibold uppercase tracking-wide text-gray-400">
@@ -158,19 +158,27 @@ export function AccountSwitcher() {
                     key={account.id}
                     type="button"
                     onClick={() => void selectAccount(account)}
-                    className="flex w-full items-center gap-2 px-4 py-2 text-left text-sm transition-colors hover:bg-gray-100"
+                    className="flex w-full items-start gap-2 px-4 py-2 text-left text-sm transition-colors hover:bg-gray-100"
                   >
-                    <AccountIcon account={account} />
-                    <span className="flex-1 truncate text-gray-900">
-                      {accountDisplayName(account)}
+                    <span className="mt-0.5">
+                      <AccountIcon account={account} />
                     </span>
-                    <AccountBalance account={account} />
-                    {account.id === activeAccountId && (
-                      <>
-                        <Check className="h-4 w-4 text-green-600" />
-                        <AccountDetailsShortcut />
-                      </>
-                    )}
+                    <span className="min-w-0 flex-1">
+                      <span className="flex items-center gap-2">
+                        <span className="min-w-0 flex-1 truncate text-gray-900">
+                          {accountDisplayName(account)}
+                        </span>
+                        {account.id === activeAccountId && (
+                          <>
+                            <Check className="h-4 w-4 flex-shrink-0 text-green-600" />
+                            <AccountDetailsShortcut />
+                          </>
+                        )}
+                      </span>
+                      <span className="mt-0.5 flex items-center justify-end gap-2">
+                        <AccountBalance account={account} />
+                      </span>
+                    </span>
                   </button>
                 ))}
               </div>
@@ -186,22 +194,34 @@ export function AccountSwitcher() {
                     key={account.id}
                     type="button"
                     onClick={() => void selectAccount(account)}
-                    className="flex w-full items-center gap-2 px-4 py-2 text-left text-sm transition-colors hover:bg-gray-100"
+                    className="flex w-full items-start gap-2 px-4 py-2 text-left text-sm transition-colors hover:bg-gray-100"
                   >
-                    <AccountIcon account={account} />
-                    <span className="truncate text-gray-900">{accountDisplayName(account)}</span>
-                    {account.kind === 'hardware' && (
-                      <span className="flex-1 truncate font-mono text-xs text-gray-400">
-                        {truncateAddress(account.address)}
+                    <span className="mt-0.5">
+                      <AccountIcon account={account} />
+                    </span>
+                    <span className="min-w-0 flex-1">
+                      <span className="flex items-center gap-2">
+                        <span className="min-w-0 flex-1 truncate text-gray-900">
+                          {accountDisplayName(account)}
+                        </span>
+                        {account.id === activeAccountId && (
+                          <>
+                            <Check className="h-4 w-4 flex-shrink-0 text-green-600" />
+                            <AccountDetailsShortcut />
+                          </>
+                        )}
                       </span>
-                    )}
-                    <AccountBalance account={account} />
-                    {account.id === activeAccountId && (
-                      <>
-                        <Check className="h-4 w-4 flex-shrink-0 text-green-600" />
-                        <AccountDetailsShortcut />
-                      </>
-                    )}
+                      <span className="mt-0.5 flex items-center justify-between gap-2">
+                        {account.kind === 'hardware' ? (
+                          <span className="min-w-0 truncate font-mono text-xs text-gray-400">
+                            {truncateAddress(account.address)}
+                          </span>
+                        ) : (
+                          <span />
+                        )}
+                        <AccountBalance account={account} />
+                      </span>
+                    </span>
                   </button>
                 ))}
               </div>

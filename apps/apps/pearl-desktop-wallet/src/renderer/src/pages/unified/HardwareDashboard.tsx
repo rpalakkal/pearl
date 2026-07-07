@@ -1,6 +1,7 @@
 import {type ReactNode} from 'react';
 import {ArrowDownLeft, ArrowUpRight, Info} from 'lucide-react';
 import {useNavigate} from 'react-router-dom';
+import {CopyButton} from '@/components/ui/copy-button';
 import {formatSatsAsPearl} from '../../lib/hardwareWallet';
 import {useHardwareAccount} from '../../hooks/hardware/useHardwareAccount';
 import {useHardwareActivity} from '../../hooks/hardware/useHardwareActivity';
@@ -22,8 +23,14 @@ export function HardwareDashboard({account}: {account: WalletAccount & {kind: 'h
       <div className="mx-auto w-full max-w-2xl space-y-6 px-4 py-8 sm:px-8">
         <div className="text-center">
           <h1 className="text-2xl font-bold text-gray-900">{accountDisplayName(account)}</h1>
-          <div className="mt-1 font-mono text-sm text-gray-500">
+          <div className="mt-1 inline-flex items-center gap-1 font-mono text-sm text-gray-500">
             {compactHardwareAddress(account.address)}
+            <CopyButton
+              value={account.address}
+              className="p-1"
+              iconClassName="h-3.5 w-3.5"
+              title="Copy address"
+            />
           </div>
           <div className="mt-6 text-sm text-gray-500">Spendable Balance</div>
           <div className="text-5xl font-bold text-gray-900">

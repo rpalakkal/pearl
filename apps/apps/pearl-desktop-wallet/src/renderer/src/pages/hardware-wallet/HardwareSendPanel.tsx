@@ -183,15 +183,24 @@ function EditStage({
         <label className="block text-sm font-medium text-gray-700">
           Recipient
           <div className="relative mt-1">
-            <input
+            {/* A wrapping textarea (kept newline-free) so the whole address is
+                visible at once; Enter still submits the form. */}
+            <textarea
               value={model.sendAddress}
-              onChange={event => actions.setSendAddress(event.target.value)}
+              rows={model.sendAddress.length > 40 ? 2 : 1}
+              onChange={event => actions.setSendAddress(event.target.value.replace(/\s+/g, ''))}
+              onKeyDown={event => {
+                if (event.key === 'Enter') {
+                  event.preventDefault();
+                  event.currentTarget.form?.requestSubmit();
+                }
+              }}
               placeholder={model.activeSendNetwork === 'testnet' ? 'tprl1...' : 'prl1...'}
               disabled={inputsDisabled}
-              className="focus:border-brand-green w-full rounded-lg border border-gray-200 bg-white py-2 pl-3 pr-10 font-mono text-sm text-gray-900 outline-none transition-colors"
+              className="focus:border-brand-green w-full resize-none break-all rounded-lg border border-gray-200 bg-white py-2 pl-3 pr-10 font-mono text-sm text-gray-900 outline-none transition-colors"
             />
             <PasteButton
-              className="absolute right-1.5 top-1/2 -translate-y-1/2 p-1"
+              className="absolute right-1.5 top-1.5 p-1"
               disabled={inputsDisabled}
               onPaste={text => actions.setSendAddress(text)}
             />
@@ -312,7 +321,9 @@ function ReviewStage({
     <div className="space-y-3">
       <div className="rounded-lg border border-gray-200 bg-white p-3">
         <div className="mb-1 text-xs font-medium uppercase text-gray-500">Recipient</div>
-        <div className="break-all font-mono text-sm text-gray-900">
+        {/* Same size as the device-display line below, so the two render
+            identically and the shared payload is easy to eyeball-compare. */}
+        <div className="break-all font-mono text-xs text-gray-900">
           <Bech32Address address={review.destinationAddress} />
         </div>
         <RecipientRecognition recipient={recipient} />
@@ -424,7 +435,7 @@ function SignedStage({
 
       <div className="rounded-lg border border-gray-200 bg-white p-3">
         <div className="mb-1 text-xs font-medium uppercase text-gray-500">Recipient</div>
-        <div className="break-all font-mono text-sm text-gray-900">
+        <div className="break-all font-mono text-xs text-gray-900">
           <Bech32Address address={snapshot.review.destinationAddress} />
         </div>
         <RecipientRecognition recipient={recipient} />

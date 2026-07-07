@@ -14,16 +14,24 @@ export default function AddressInput({ address, onChange, error, onBlur }: Addre
     <div className="space-y-2">
       <label className="text-sm text-neutral-400">Recipient Address</label>
       <div className="relative">
-        <input
-          type="text"
+        {/* A wrapping textarea (kept newline-free) so the whole address is
+            visible at once; Enter still submits like a plain input. */}
+        <textarea
           value={address}
-          onChange={e => onChange(e.target.value)}
+          rows={address.length > 40 ? 2 : 1}
+          onChange={e => onChange(e.target.value.replace(/\s+/g, ''))}
+          onKeyDown={e => {
+            if (e.key === 'Enter') {
+              e.preventDefault();
+              e.currentTarget.form?.requestSubmit();
+            }
+          }}
           onBlur={onBlur}
           placeholder="Insert a recipient address"
-          className="focus:border-brand-green focus:ring-brand-green/20 w-full rounded-lg border border-gray-300 bg-white py-3 pl-4 pr-11 font-mono text-sm text-gray-900 placeholder-gray-400 shadow-sm focus:outline-none focus:ring-2"
+          className="focus:border-brand-green focus:ring-brand-green/20 w-full resize-none break-all rounded-lg border border-gray-300 bg-white py-3 pl-4 pr-11 font-mono text-sm text-gray-900 placeholder-gray-400 shadow-sm focus:outline-none focus:ring-2"
         />
         <PasteButton
-          className="absolute right-2 top-1/2 -translate-y-1/2"
+          className="absolute right-2 top-2.5"
           onPaste={text => {
             onChange(text);
             onBlur?.(); // fire blur validation on the pasted value

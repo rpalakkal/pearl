@@ -6,7 +6,6 @@ import {useAddressBook, type KnownAddress} from './useAddressBook';
 export function KnownAddressBadge({entry}: {entry: KnownAddress}) {
   const isContact = entry.source === 'contact';
   const Icon = isContact ? UserRound : Wallet;
-  const text = isContact ? `Contact: ${entry.label}` : entry.label;
   return (
     <div
       className={`inline-flex max-w-full items-center gap-1 rounded border px-2 py-1 text-xs ${
@@ -16,7 +15,12 @@ export function KnownAddressBadge({entry}: {entry: KnownAddress}) {
       }`}
     >
       <Icon className="h-3 w-3 flex-shrink-0" />
-      <span className="truncate">{text}</span>
+      <span className="truncate">{isContact ? `Contact: ${entry.label}` : entry.label}</span>
+      {!isContact && (
+        <span className="flex-shrink-0 rounded-sm bg-blue-100 px-1 text-[10px] font-semibold uppercase tracking-wide text-blue-700">
+          yours
+        </span>
+      )}
     </div>
   );
 }

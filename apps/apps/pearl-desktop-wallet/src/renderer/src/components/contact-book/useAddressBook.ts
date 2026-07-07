@@ -1,5 +1,6 @@
 import {useCallback, useEffect, useMemo, useState} from 'react';
 import {useContactsStore} from '../../store/contactsStore';
+import {useWalletStore} from '../../store/walletStore';
 import {
   getHardwareWalletProviderName,
   normalizePearlNetwork,
@@ -35,10 +36,11 @@ function listKnownHardwareAddresses(): KnownAddress[] {
         const networkSuffix = account.network === 'testnet' ? ' (testnet)' : '';
         const accountName =
           account.label?.trim() ||
-          `${getHardwareWalletProviderName(vendor)} address #${account.addressIndex}`;
+          `${getHardwareWalletProviderName(vendor)} #${account.addressIndex}`;
+        // Ownership is marked by the badge/section, not baked into the name.
         entries.push({
           address: account.address,
-          label: `Your ${accountName}${networkSuffix}`,
+          label: `${accountName}${networkSuffix}`,
           source: 'hardware',
         });
       }
@@ -111,10 +113,17 @@ export function useAddressBook() {
     [contacts]
   );
 
+  // Every receive address the software wallet has handed out; labeled by
+  // wallet name so the "My Addresses" list explains itself.
+  const walletName = useWalletStore(state => state.walletName);
   const myAddressEntries = useMemo<KnownAddress[]>(() => {
+    const walletLabel =
+      walletName && walletName !== 'Pearl Wallet'
+        ? `${walletName} · receive address`
+        : 'Wallet receive address';
     const entries: KnownAddress[] = walletAddresses.map(address => ({
       address,
-      label: 'Your wallet address',
+      label: walletLabel,
       source: 'wallet',
     }));
     const seen = new Set(entries.map(entry => normalizeAddress(entry.address)));
@@ -125,7 +134,7 @@ export function useAddressBook() {
       }
     }
     return entries;
-  }, [walletAddresses, hardwareAddresses]);
+  }, [walletAddresses, hardwareAddresses, walletName]);
 
   // Contacts take precedence over own addresses when both match, so a named
   // entry always wins in recognition.
