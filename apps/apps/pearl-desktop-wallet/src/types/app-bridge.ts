@@ -191,9 +191,11 @@ interface AppLockApi {
 interface ManagerApi {
   getWalletsStats: () => {name?: string};
 
-  selectWallet: (walletName: string) => Promise<void>;
+  // Starts the wallet process and auto-unlocks it from the app-lock vault;
+  // passphraseAvailable=false means the one-time migration prompt is needed.
+  selectWallet: (walletName: string) => Promise<{passphraseAvailable: boolean}>;
 
-  create: (options: {name: string; password: string}) => Promise<{seed: string}>;
+  create: (options: {name: string; password?: string}) => Promise<{seed: string}>;
 
   import: (options: {
     name: string;

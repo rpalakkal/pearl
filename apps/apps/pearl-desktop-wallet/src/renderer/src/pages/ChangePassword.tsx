@@ -1,12 +1,15 @@
 import { useState } from 'react';
 import { ArrowLeft, Key, Eye, EyeOff, AlertCircle, CheckCircle2 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import { useWalletStore } from '../store/walletStore';
 import PasswordStrength from './create-wallet/PasswordStrength';
+import { getErrorMessage } from '../lib/utils';
+import { useAppLockGuard } from '../hooks/useAppLockGuard';
 
+// Changes the app-wide password (re-encrypts the vault). Individual wallet
+// passphrases are managed by the vault and are not user-facing anymore.
 export default function ChangePassword() {
+  useAppLockGuard();
   const navigate = useNavigate();
-  const { walletName } = useWalletStore();
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -52,19 +55,19 @@ export default function ChangePassword() {
     setError(null);
     setSuccess(null);
 
-    console.log('🔄 Changing wallet password...');
+    console.log('🔄 Changing app password...');
 
     try {
-      await window.appBridge.wallet.changeWalletPassphrase(currentPassword, newPassword);
+      await window.appBridge.appLock.changePassword(currentPassword, newPassword);
 
-      console.log('✅ Password changed successfully');
-      setSuccess('Password changed successfully!');
+      console.log('✅ App password changed successfully');
+      setSuccess('App password changed successfully!');
       setCurrentPassword('');
       setNewPassword('');
       setConfirmPassword('');
     } catch (err) {
       console.error('❌ Exception during password change:', err);
-      setError('An error occurred while changing the password');
+      setError(getErrorMessage(err, 'An error occurred while changing the password'));
     } finally {
       setIsChanging(false);
     }
@@ -91,8 +94,10 @@ export default function ChangePassword() {
             <div className="mb-6 inline-flex h-16 w-16 items-center justify-center rounded-full bg-amber-600">
               <Key className="h-8 w-8 text-white" />
             </div>
-            <h2 className="mb-2 text-2xl font-bold text-gray-900">Change Wallet Password</h2>
-            <p className="text-gray-600">Update the password for wallet "{walletName}"</p>
+            <h2 className="mb-2 text-2xl font-bold text-gray-900">Change App Password</h2>
+            <p className="text-gray-600">
+              Update the password that unlocks Pearl Wallet on this device
+            </p>
           </div>
 
           {/* Change Password Form */}

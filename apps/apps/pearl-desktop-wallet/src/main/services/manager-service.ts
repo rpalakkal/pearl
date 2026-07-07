@@ -10,6 +10,7 @@ import { WalletProcess } from './wallet-process.ts';
 import { displayToFs, fsToDisplay } from '../../utils/filename-utils.ts';
 import { getCurrentNetworkConfig, getCurrentNetwork, setCurrentNetwork, getAllNetworks, type Network } from '../config/network-config';
 import { getPeerAddress, getPeerPort, getPeerSettings as getConfigPeerSettings, setCustomPeer, resetToDefaultPeer } from '../config/peer-settings';
+import * as appLock from '../config/app-lock';
 import { randomBytes } from 'crypto';
 
 
@@ -150,7 +151,7 @@ class ManagerService implements ManagerApi {
     };
   }
 
-  async selectWallet(walletName: string) {
+  async selectWallet(walletName: string): Promise<{ passphraseAvailable: boolean }> {
     // Validate peer before starting wallet
     const peerAddress = getPeerAddress();
     const peerPort = getPeerPort();
@@ -171,34 +172,83 @@ class ManagerService implements ManagerApi {
       console.log('Failed to stop wallet process:', error);
     }
 
-    try {
-      await this.loadWallet(walletName, 'open');
-    } catch (error) {
-      console.log('Failed to load wallet:', error);
-    }
-
-    try {
-      await this.startWalletProcess();
-    } catch (error) {
-      console.log('Failed to start wallet process:', error);
-    }
+    // Load/start failures now propagate so the renderer can show a real
+    // error instead of retrying against a dead service.
+    await this.loadWallet(walletName, 'open');
+    await this.startWalletProcess();
 
     this.currentWallet = { name: walletName };
+
+    return { passphraseAvailable: await this.unlockFromVault(walletName) };
   }
 
-  async create(options: { name: string; password: string }) {
-    const { name, password } = options;
+  // Unlocks the running wallet with its vaulted passphrase, when the app is
+  // unlocked and a passphrase is stored. Returns whether that succeeded so
+  // the renderer knows to run the one-time migration prompt.
+  private async unlockFromVault(walletName: string): Promise<boolean> {
+    if (appLock.getStatus() !== 'unlocked' || !this.walletService) {
+      return false;
+    }
+
+    const passphrase = appLock.getWalletPassphrase(walletName);
+    if (!passphrase) {
+      return false;
+    }
+
+    try {
+      await this.walletService.unlockWallet(
+        passphrase,
+        ManagerService.WALLET_UNLOCK_TIMEOUT_SECONDS
+      );
+      return true;
+    } catch (error) {
+      // A stale vault entry behaves like a missing one: the UI re-prompts.
+      console.error('Vaulted passphrase failed to unlock wallet:', error);
+      return false;
+    }
+  }
+
+  // Runs a wallet operation, re-arming the wallet passphrase from the vault
+  // once if the wallet reports it re-locked (the RPC unlock has a timeout).
+  async withWalletAutoUnlock<T>(fn: () => Promise<T>): Promise<T> {
+    try {
+      return await fn();
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      const looksLocked = /wallet is locked|walletpassphrase|unlock/i.test(message);
+      const walletName = this.currentWallet?.name;
+
+      if (!looksLocked || !walletName || !(await this.unlockFromVault(walletName))) {
+        throw error;
+      }
+
+      return fn();
+    }
+  }
+
+  // Wallet passphrases are generated randomly and stored in the app-lock
+  // vault; the seed phrase is the recovery path. The legacy `password`
+  // option is ignored.
+  async create(options: { name: string; password?: string }) {
+    const { name } = options;
+
+    if (appLock.getStatus() !== 'unlocked') {
+      throw new Error('Unlock the app before creating a wallet');
+    }
 
     await this.stopWalletProcess();
 
     await this.loadWallet(name, 'create');
 
-    const createResult = await this.walletProcess?.createWalletAndGetSeed(password || 'walletpass');
+    const passphrase = appLock.generateWalletPassphrase();
+    const createResult = await this.walletProcess?.createWalletAndGetSeed(passphrase);
     if (!createResult || !createResult.success || !createResult.seed) {
       throw new Error(
         `Failed to create wallet${createResult && 'error' in createResult ? `: ${createResult.error}` : ''}`
       );
     }
+
+    appLock.storeWalletPassphrase(name, passphrase);
 
     const generatedSeed = createResult.seed;
 
@@ -206,12 +256,13 @@ class ManagerService implements ManagerApi {
 
     this.currentWallet = { name };
 
+    await this.unlockFromVault(name);
+
     return { seed: generatedSeed };
   }
 
   async import(options: { name: string; seed: string; password?: string }) {
-    const { name, seed, password = 'walletpass' } = options;
-    const finalPassword = password && password.trim() ? password.trim() : 'walletpass';
+    const { name, seed } = options;
 
     if (!name) {
       throw new Error('Wallet name is required');
@@ -219,15 +270,23 @@ class ManagerService implements ManagerApi {
     if (!seed) {
       throw new Error('Seed phrase is required');
     }
+    if (appLock.getStatus() !== 'unlocked') {
+      throw new Error('Unlock the app before importing a wallet');
+    }
+
     await this.stopWalletProcess();
 
     await this.loadWallet(name, 'create');
-    const importResult = await this.walletProcess?.importWalletFromSeed(seed, finalPassword);
+
+    const passphrase = appLock.generateWalletPassphrase();
+    const importResult = await this.walletProcess?.importWalletFromSeed(seed, passphrase);
     if (!importResult || !importResult.success) {
       throw new Error(
         `Failed to import wallet: ${importResult && 'error' in importResult ? importResult.error : 'Unknown error'}`
       );
     }
+
+    appLock.storeWalletPassphrase(name, passphrase);
 
     try {
       await this.startWalletProcess();
@@ -236,6 +295,9 @@ class ManagerService implements ManagerApi {
     }
 
     this.currentWallet = { name };
+
+    await this.unlockFromVault(name);
+
     return { name, seed };
   }
 
@@ -251,7 +313,10 @@ class ManagerService implements ManagerApi {
         .filter(name => {
           const walletDbPath = path.join(baseWalletDir, name, networkConfig.dataSubdir, 'wallet.db');
           return fs.existsSync(walletDbPath);
-        });
+        })
+        // readdir order is filesystem-dependent; sort so defaultWallet is
+        // stable across launches instead of flip-flopping between wallets.
+        .sort((left, right) => left.localeCompare(right));
     }
 
     return { walletNames, defaultWallet: walletNames.length > 0 ? walletNames[0] : undefined };

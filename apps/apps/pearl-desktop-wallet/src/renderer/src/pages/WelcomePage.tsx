@@ -4,7 +4,20 @@ import {Link, useNavigate} from 'react-router-dom';
 import {useEffect, useState} from 'react';
 import {NetworkSelector} from '../components/NetworkSelector';
 import {SettingsButton} from '../components/SettingsButton';
+import {listStoredHardwareAccounts} from '../lib/hardwareWalletStorage';
+import {normalizePearlNetwork} from '../lib/hardwareWallet';
 import {Logo, LogoSmall} from '@pearl/ui';
+
+function hasStoredHardwareAccounts(): boolean {
+  for (const network of ['mainnet', 'testnet'] as const) {
+    for (const vendor of ['ledger', 'trezor'] as const) {
+      if (listStoredHardwareAccounts(normalizePearlNetwork(network), vendor).length > 0) {
+        return true;
+      }
+    }
+  }
+  return false;
+}
 
 const features = [
   {
@@ -30,39 +43,55 @@ export default function WelcomePage() {
   const [existingWalletName, setExistingWalletName] = useState<string | null>(null);
 
   useEffect(() => {
-    // Check if user came from unlock screen (bypass auto-redirect)
+    // Allow onboarding flows to show the welcome screen without the boot
+    // redirect (e.g. adding a wallet while already unlocked).
     const urlParams = new URLSearchParams(window.location.hash.split('?')[1]);
     const skipCheck = urlParams.get('skipCheck');
 
     if (skipCheck === 'true') {
       setIsCheckingWallet(false);
     } else {
-      checkForExistingWallet();
+      boot();
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const checkForExistingWallet = async () => {
+  // Boot router: the app-wide lock decides where we land.
+  const boot = async () => {
     try {
-      console.log('[WelcomePage] Checking for existing wallets...');
+      const status = await window.appBridge.appLock.getStatus();
+
+      if (status === 'locked') {
+        navigate('/unlock', {replace: true});
+        return;
+      }
+
       const result = await window.appBridge.manager.getExistingWallets();
+      const hasSoftwareWallets = result.walletNames.length > 0;
+      const hasHardwareAccounts = hasStoredHardwareAccounts();
 
-      if (result.walletNames.length > 0) {
-        const defaultWallet = result.defaultWallet ?? result.walletNames[0] ?? 'Unknown';
-        setExistingWalletName(defaultWallet);
+      if (status === 'uninitialized') {
+        if (hasSoftwareWallets || hasHardwareAccounts) {
+          // Migration: existing accounts predate the app password.
+          setExistingWalletName(result.defaultWallet ?? result.walletNames[0] ?? null);
+          navigate('/setup', {replace: true});
+          return;
+        }
+        // First run: show the welcome CTAs.
+        return;
+      }
 
-        // Pass wallet information to unlock screen
-        navigate('/unlock', {
-          state: {
-            walletNames: result.walletNames,
-            walletCount: result.walletNames.length,
-            defaultWallet,
-          },
-        });
-      } else {
-        console.log('[WelcomePage] No existing wallet found, showing welcome screen');
+      // Unlocked (e.g. renderer reload): resume into the app.
+      if (hasSoftwareWallets) {
+        navigate('/unlock', {replace: true}); // auto-activates without prompting
+        return;
+      }
+      if (hasHardwareAccounts) {
+        navigate('/hardware-wallet', {replace: true});
+        return;
       }
     } catch (error) {
-      console.error('[WelcomePage] Error checking existing wallet:', error);
+      console.error('[WelcomePage] Boot check failed:', error);
     } finally {
       setIsCheckingWallet(false);
     }

@@ -6,7 +6,8 @@ import WalletDashboard from './pages/WalletDashboard';
 import ActivityPage from './pages/ActivityPage';
 import SendTransaction from './pages/send-transaction/SendTransaction';
 import ReceiveTransaction from './pages/ReceiveTransaction';
-import WalletUnlock from './pages/WalletUnlock';
+import AppLockScreen from './pages/app-lock/AppLockScreen';
+import AppLockSetup from './pages/app-lock/AppLockSetup';
 import ChangePassword from './pages/ChangePassword';
 import HardwareWallet from './pages/HardwareWallet';
 import {useNavigate} from 'react-router-dom';
@@ -28,7 +29,8 @@ function AppContent() {
           <Route path="/send" element={<SendTransaction />} />
           <Route path="/receive" element={<ReceiveTransaction />} />
           <Route path="/hardware-wallet" element={<HardwareWallet />} />
-          <Route path="/unlock" element={<WalletUnlock />} />
+          <Route path="/unlock" element={<AppLockScreen />} />
+          <Route path="/setup" element={<AppLockSetup />} />
           <Route path="/change-password" element={<ChangePassword />} />
           <Route path="/import-account" element={<ImportAccount />} />
           <Route path="/onboarding/create" element={<CreateWallet />} />

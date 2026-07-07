@@ -22,7 +22,11 @@ function registerWalletIpc(ms: ManagerService) {
   ipcMain.handle(
     'wallet-send-from-default-account',
     async (_event, toAddress: string, amount: number, feeRate: number) => {
-      const txid = await ms.ensureWalletService().sendFromDefaultAccount(toAddress, amount, feeRate);
+      // Re-arms the wallet passphrase from the vault if the RPC unlock
+      // window expired since the wallet was selected.
+      const txid = await ms.withWalletAutoUnlock(() =>
+        ms.ensureWalletService().sendFromDefaultAccount(toAddress, amount, feeRate)
+      );
 
       // Record for the large-send gate; the transaction already broadcast, so
       // a bookkeeping failure must never fail the send.

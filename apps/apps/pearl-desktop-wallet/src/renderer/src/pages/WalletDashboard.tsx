@@ -13,8 +13,10 @@ import {useNavigate} from 'react-router-dom';
 import {useWalletStore} from '../store/walletStore';
 import {formatPearlAmount} from '../lib/crypto';
 import {Tooltip, TooltipContent, TooltipProvider, TooltipTrigger} from '../components/ui/tooltip';
+import {useAppLockGuard} from '../hooks/useAppLockGuard';
 
 export default function WalletDashboard() {
+  useAppLockGuard();
   const navigate = useNavigate();
   const {
     walletName,
@@ -45,19 +47,14 @@ export default function WalletDashboard() {
     clearWalletData();
 
     try {
-      // During birthday recovery the Go wallet holds a bolt write txn for the
-      // duration of the current 2000-block batch, which makes the polite
-      // `walletlock` RPC hang for up to a minute. Fall back to a force-stop
-      // (SIGKILL) so the UI stays responsive. bbolt commits are atomic at txn
-      // boundaries, so a mid-batch kill just replays the batch on next open.
-      if (syncPhase === 'blocks') {
-        await window.appBridge.wallet.forceLockWallet();
-      } else {
-        await window.appBridge.wallet.lockWallet();
-      }
-      console.log('✅ Wallet locked successfully');
+      // App-wide lock: stops the wallet process AND drops the vault key from
+      // main memory. During birthday recovery the polite `walletlock` RPC can
+      // hang for up to a minute, so use the force (SIGKILL) path — bbolt
+      // commits are atomic at txn boundaries, a mid-batch kill just replays.
+      await window.appBridge.appLock.lock({force: syncPhase === 'blocks'});
+      console.log('✅ App locked successfully');
     } catch (err) {
-      console.error('❌ Exception during wallet lock:', err);
+      console.error('❌ Exception during app lock:', err);
     } finally {
       // Always navigate — the Go process is either dead or actively dying.
       // Leaving the user on a blank dashboard would be worse than showing the

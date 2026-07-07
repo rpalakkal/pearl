@@ -8,22 +8,23 @@ import WalletSetupStep from './WalletSetupStep';
 import SeedDisplay from './SeedDisplay';
 import SeedVerification from './SeedVerification';
 import { useWalletStore } from '../../store/walletStore';
+import { useAppLockGuard } from '../../hooks/useAppLockGuard';
 
 type CreateWalletStep = 'wallet-setup' | 'seed-display' | 'seed-verification' | 'complete';
 
 export default function CreateWallet() {
+  useAppLockGuard();
   const [step, setStep] = useState<CreateWalletStep>('wallet-setup');
   const [generatedSeed, setGeneratedSeed] = useState<string>('');
   const navigate = useNavigate();
   const { clearWalletData } = useWalletStore();
 
-  async function handleWalletCreated(walletName: string, password: string) {
+  async function handleWalletCreated(walletName: string) {
     try {
       // Clear wallet data immediately to prevent showing old wallet data during creation
       clearWalletData();
       const result = await window.appBridge.manager.create({
         name: walletName,
-        password: password,
       });
 
       setGeneratedSeed(result.seed);
