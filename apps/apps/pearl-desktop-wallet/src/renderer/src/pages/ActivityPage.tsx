@@ -74,7 +74,7 @@ export default function ActivityPage({onBack}: ActivityPageProps) {
         )}
         {isHardware && hardware.walletSyncing && !hardware.error && (
           <div className="mb-4 rounded-lg border border-blue-200 bg-blue-50 p-3 text-sm text-blue-900">
-            The local chain host is syncing — history appears when it completes.
+            The local wallet is still syncing the chain — history appears when it completes.
           </div>
         )}
         {loading && activities.length === 0 ? (

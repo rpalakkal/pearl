@@ -1,5 +1,6 @@
 import {useEffect, useRef, useState} from 'react';
 import {hardwareAccountKey} from '../../pages/hardware-wallet/pageModel.ts';
+import {useWalletStore} from '../../store/walletStore.ts';
 import {getErrorMessage} from '../../lib/utils.ts';
 import type {HardwareWalletAddress} from '../../lib/hardwareWallet.ts';
 import type {HardwareBalanceSource} from '../../../../types/app-bridge.ts';
@@ -64,6 +65,11 @@ export function useHardwareActivity(account: HardwareWalletAddress | null) {
     }
   }
 
+  // Defer loads while the backing wallet is scanning blocks: its write lock
+  // is held for whole batches and importpubkey-backed reads would time out.
+  const syncPhase = useWalletStore(state => state.syncPhase);
+  const recoveryBlocking = syncPhase === 'blocks';
+
   useEffect(() => {
     setActivities([]);
     setHasMore(false);
@@ -71,18 +77,26 @@ export function useHardwareActivity(account: HardwareWalletAddress | null) {
     setWalletSyncing(false);
     setError(null);
     pageRef.current = 1;
-    if (account) {
+    if (account && !recoveryBlocking) {
       void loadPage(1);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [accountKey]);
+
+  // Deferred initial load once recovery finishes.
+  useEffect(() => {
+    if (account && !recoveryBlocking && activities.length === 0 && !loading && !error) {
+      void loadPage(1);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [recoveryBlocking, accountKey]);
 
   return {
     activities,
     loading,
     hasMore,
     source,
-    walletSyncing,
+    walletSyncing: walletSyncing || recoveryBlocking,
     error,
     loadMore: () => {
       pageRef.current += 1;

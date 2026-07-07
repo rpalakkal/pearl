@@ -45,7 +45,8 @@ export function HardwareBalancePanel({
         <div className="mb-3 flex items-center gap-1.5 rounded-md border border-blue-200 bg-blue-50 p-2 text-xs text-blue-900">
           <Loader2 className="h-3 w-3 flex-shrink-0 animate-spin" />
           <span>
-            The local chain host is syncing — balances may be incomplete until it finishes.
+            The local wallet is still syncing the chain — balances may be incomplete until it
+            finishes.
           </span>
         </div>
       )}
@@ -102,9 +103,12 @@ export function HardwareBalancePanel({
             <div className="mt-2 rounded-md border border-amber-200 bg-amber-50 p-2 text-xs text-amber-900">
               <div className="mb-1 flex items-center justify-between">
                 <span>Backfill in progress — balance may be incomplete until it finishes.</span>
+                {/* The scan target is resolved only once the chain is synced;
+                    until then the job is queued, not stuck. */}
                 <span className="font-mono">
-                  {backfill.currentHeight.toLocaleString()} /{' '}
-                  {backfill.targetHeight.toLocaleString()}
+                  {backfill.targetHeight > 0
+                    ? `${backfill.currentHeight.toLocaleString()} / ${backfill.targetHeight.toLocaleString()}`
+                    : 'waiting for chain sync'}
                 </span>
               </div>
               <div className="h-1.5 w-full overflow-hidden rounded-full bg-amber-100">

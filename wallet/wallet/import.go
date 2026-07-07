@@ -295,36 +295,51 @@ func (w *Wallet) ImportPublicKey(pubKey *btcec.PublicKey,
 		return err
 	}
 
-	var addr waddrmgr.ManagedAddress
-	err = walletdb.Update(w.db, func(tx walletdb.ReadWriteTx) error {
-		ns := tx.ReadWriteBucket(waddrmgrNamespaceKey)
-		addr, err = scopedKeyManager.ImportPublicKey(ns, pubKey, nil)
-		return err
-	})
-	isDuplicate := waddrmgr.IsError(err, waddrmgr.ErrDuplicateAddress)
-	if err != nil && !isDuplicate {
+	// Derive the taproot address the same way the manager computes the
+	// stored address ID, so existence can be checked read-only.
+	taprootKey := txscript.ComputeTaprootKeyNoScript(pubKey)
+	var address btcutil.Address
+	address, err = btcutil.NewAddressTaproot(
+		schnorr.SerializePubKey(taprootKey), w.chainParams,
+	)
+	if err != nil {
 		return err
 	}
 
-	var address btcutil.Address
-	if isDuplicate {
-		// The key is already tracked. Derive its taproot address the
-		// same way the manager computes the stored address ID so the
-		// notification subscription below still covers it. A rescan is
-		// intentionally not repeated for duplicates; the first import
-		// already scheduled one when requested.
-		taprootKey := txscript.ComputeTaprootKeyNoScript(pubKey)
-		address, err = btcutil.NewAddressTaproot(
-			schnorr.SerializePubKey(taprootKey), w.chainParams,
-		)
-		if err != nil {
-			return err
-		}
+	// Fast path for repeat imports: a read-only existence check. This
+	// matters operationally — bbolt read transactions do not block on the
+	// writer, but a write transaction queues behind birthday recovery's
+	// long-held batch transaction. Hardware wallet balance reads import on
+	// every refresh, and must not stall behind a recovery batch once the
+	// key is known.
+	isDuplicate, err := w.HaveAddress(address)
+	if err != nil {
+		return err
+	}
 
+	if !isDuplicate {
+		var addr waddrmgr.ManagedAddress
+		err = walletdb.Update(w.db, func(tx walletdb.ReadWriteTx) error {
+			ns := tx.ReadWriteBucket(waddrmgrNamespaceKey)
+			addr, err = scopedKeyManager.ImportPublicKey(ns, pubKey, nil)
+			return err
+		})
+		// A concurrent import may have won the race; treat it as the
+		// duplicate path.
+		if waddrmgr.IsError(err, waddrmgr.ErrDuplicateAddress) {
+			isDuplicate = true
+		} else if err != nil {
+			return err
+		} else {
+			address = addr.Address()
+			log.Infof("Imported address %v", address)
+		}
+	}
+
+	if isDuplicate {
+		// A rescan is intentionally not repeated for duplicates; the
+		// first import already scheduled one when requested.
 		log.Debugf("Public key for address %v already imported", address)
-	} else {
-		address = addr.Address()
-		log.Infof("Imported address %v", address)
 	}
 
 	err = w.chainClient.NotifyReceived([]btcutil.Address{address})

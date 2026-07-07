@@ -45,6 +45,7 @@ import type {
 import {evaluateSendGate, satsToPearlInput} from '../../lib/sendGate.ts';
 import {useAddressBook} from '../../components/contact-book/useAddressBook.ts';
 import {useContactsStore} from '../../store/contactsStore.ts';
+import {useWalletStore} from '../../store/walletStore.ts';
 import {getErrorMessage} from '../../lib/utils.ts';
 import type {AddressBackfillStatus, RecipientSendStatus} from '../../../../types/app-bridge.ts';
 
@@ -131,6 +132,13 @@ export function useHardwareAccount(
   const {resolveAddress} = useAddressBook();
   const updateContact = useContactsStore(state => state.updateContact);
 
+  // While the backing wallet is scanning blocks (birthday recovery) it holds
+  // a long write transaction: importpubkey-backed reads would queue behind
+  // it and time out. Defer loads until the phase passes instead of hammering
+  // the RPC. syncPhase is polled globally by SyncWallet.
+  const syncPhase = useWalletStore(state => state.syncPhase);
+  const recoveryBlocking = syncPhase === 'blocks';
+
   const [copiedAddress, setCopiedAddress] = useState(false);
   const [verifyError, setVerifyError] = useState<string | null>(null);
   const [verifiedDeviceAddress, setVerifiedDeviceAddress] = useState<string | null>(null);
@@ -167,12 +175,22 @@ export function useHardwareAccount(
     backfillProgressRef.current = null;
     setCopiedAddress(false);
 
-    if (account) {
+    if (account && !recoveryBlocking) {
       void loadHardwareWalletBalance(account);
       void loadFeeRate(account.network);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [accountKey]);
+
+  // Deferred initial load: once block recovery finishes, fetch the balance
+  // that was skipped above.
+  useEffect(() => {
+    if (account && !recoveryBlocking && !addressInfo && !isLoadingBalance) {
+      void loadHardwareWalletBalance(account);
+      void loadFeeRate(account.network);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [recoveryBlocking, accountKey]);
 
   const loadFeeRate = async (network: PearlNetwork) => {
     try {
@@ -343,6 +361,13 @@ export function useHardwareAccount(
 
   const backfillHardwareAddress = async () => {
     if (!account || hasPendingDeviceOperation || isBackfillInFlight) {
+      return;
+    }
+
+    if (recoveryBlocking) {
+      setBackfillError(
+        'The wallet is scanning blocks for its own transactions; try again when it finishes.'
+      );
       return;
     }
 
@@ -634,7 +659,7 @@ export function useHardwareAccount(
         backfillStalled,
         balanceError,
         balanceSource,
-        walletSyncing,
+        walletSyncing: walletSyncing || recoveryBlocking,
         canBackfill: balanceSource !== null,
         hardwareAddress: account,
         hasPendingDeviceOperation,
