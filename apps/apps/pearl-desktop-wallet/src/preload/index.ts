@@ -2,6 +2,7 @@ import {contextBridge, ipcRenderer} from 'electron';
 import {
   AppBridge,
   ContactsApi,
+  SendHistoryApi,
   HardwareWalletApi,
   Ipc,
   WindowApi,
@@ -54,9 +55,14 @@ const hardwareWalletIpc: Ipc<HardwareWalletApi> = {
 
 const contactsIpc: Ipc<ContactsApi> = {
   list: () => ipcRenderer.invoke('contacts-list'),
-  add: (name, address) => ipcRenderer.invoke('contacts-add', name, address),
+  add: (name, address, extras) => ipcRenderer.invoke('contacts-add', name, address, extras),
   update: (id, updates) => ipcRenderer.invoke('contacts-update', id, updates),
   remove: id => ipcRenderer.invoke('contacts-remove', id),
+};
+
+const sendHistoryIpc: Ipc<SendHistoryApi> = {
+  getRecipientStatus: (address, network) =>
+    ipcRenderer.invoke('send-history-recipient-status', address, network),
 };
 
 const managerIpc: Ipc<ManagerApi> = {
@@ -97,6 +103,7 @@ const appBridge: AppBridge = {
   wallet: walletIpc,
   hardwareWallet: hardwareWalletIpc,
   contacts: contactsIpc,
+  sendHistory: sendHistoryIpc,
   manager: managerIpc,
   sync: syncIpc,
   update: updateIpc,

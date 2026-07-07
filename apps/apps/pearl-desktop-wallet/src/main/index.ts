@@ -7,6 +7,7 @@ import { createMainWindow } from './services/window-service/create-window';
 import { registerWindowIpc } from './ipc/register-window-ipc';
 import { registerManagerIpc } from './ipc/register-manager-ipc';
 import { registerContactsIpc } from './ipc/register-contacts-ipc';
+import { registerSendHistoryIpc } from './ipc/register-send-history-ipc';
 import { ManagerService } from './services/manager-service';
 import { registerSyncIpc } from './ipc/register-sync-ipc';
 import { SyncService } from './services/sync-service';
@@ -78,6 +79,8 @@ app.whenReady().then(() => {
   registerWalletIpc(managerService);
 
   registerContactsIpc();
+
+  registerSendHistoryIpc(managerService);
 
   const syncService = new SyncService(managerService);
   registerSyncIpc(syncService);

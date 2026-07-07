@@ -26,6 +26,7 @@ import {
   getSpendableHardwareUtxoValue,
   hardwareAccountKey,
   hardwareAccountLogContext,
+  hardwareBalanceLogContext,
   hasPendingOutgoingHardwareTransaction,
   isPendingHardwareUtxo,
   logHardwareWalletEvent,
@@ -48,10 +49,16 @@ import type {
 import type {AddressBackfillStatus} from '../../../../types/app-bridge.ts';
 import {getErrorMessage} from '../../lib/utils.ts';
 import {
+  broadcastApprovedHardwareSend,
+  prepareHardwareSendReview,
+  signHardwareSendFromReview,
   PENDING_OUTGOING_HARDWARE_SEND_MESSAGE,
-  sendHardwareTransactionWorkflow,
 } from './sendWorkflow.ts';
-import {useHardwareSendFormState} from './useHardwareSendFormState.ts';
+import {useHardwareSendFormState, type RecipientContext} from './useHardwareSendFormState.ts';
+import {evaluateSendGate, satsToPearlInput} from '../../lib/sendGate.ts';
+import {useAddressBook} from '../../components/contact-book/useAddressBook.ts';
+import {useContactsStore} from '../../store/contactsStore.ts';
+import type {RecipientSendStatus} from '../../../../types/app-bridge.ts';
 import {useHardwareWalletBalanceState} from './useHardwareWalletBalanceState.ts';
 import {useHardwareWalletOperationState} from './useHardwareWalletOperationState.ts';
 import type {HardwareWalletBalanceData} from './balanceData.ts';
@@ -94,18 +101,20 @@ export function useHardwareWalletController(): HardwareWalletViewProps {
   } = useHardwareWalletBalanceState(fetchHardwareWalletBalanceData);
   const [copiedAddress, setCopiedAddress] = useState(false);
   const {
+    dispatchSendStage,
     lastSendFee,
     resetSendState,
     sendAddress,
     sendAmount,
     sendError,
+    sendStage,
     sendSuccess,
     setLastSendFee,
     setSendAddress,
     setSendAmount,
-    setSendError,
-    setSendSuccess,
   } = useHardwareSendFormState();
+  const {resolveAddress} = useAddressBook();
+  const updateContact = useContactsStore(state => state.updateContact);
   const [verifyError, setVerifyError] = useState<string | null>(null);
   const [verifiedDeviceAddress, setVerifiedDeviceAddress] = useState<string | null>(null);
   const [backfillStatus, setBackfillStatus] = useState<AddressBackfillStatus | null>(null);
@@ -685,45 +694,235 @@ export function useHardwareWalletController(): HardwareWalletViewProps {
     }
   };
 
-  const sendHardwareTransaction = async () => {
-    if (!hardwareAddress) {
+  const beginSendReview = async (amountOverride?: string) => {
+    if (!hardwareAddress || hasPendingDeviceOperation) {
+      return;
+    }
+    // With an override amount (the test-send shortcut) the closure may still
+    // see the pre-cancel stage; the reducer's own guards keep transitions
+    // legal in that case.
+    if (sendStage.step !== 'edit' && amountOverride === undefined) {
       return;
     }
 
     const account = hardwareAddress;
-    resetSendState(false);
+    dispatchSendStage({type: 'review-preparing'});
+
+    const result = await prepareHardwareSendReview({
+      account,
+      amountInput: amountOverride ?? sendAmount,
+      recipientInput: sendAddress,
+      feeRatePrlPerKb: feeRate,
+      utxos,
+      estimateFeeRate: () => refreshFeeRateForSend(account),
+      fetchBalanceData: fetchHardwareWalletBalanceData,
+      isActiveHardwareAccount,
+    });
+
+    if (result.status === 'stale') {
+      return;
+    }
+
+    if (result.status === 'error') {
+      if (result.balance) {
+        setHardwareBalanceData(result.balance);
+      }
+      if (result.feeRate) {
+        setFeeRate(result.feeRate);
+      }
+      dispatchSendStage({type: 'stage-invalidated', message: result.message});
+      return;
+    }
+
+    setHardwareBalanceData(result.balance);
+    setFeeRate(result.review.feeRatePrlPerKb);
+
+    // Recipient context: recognition, prior send history, and the gate. A
+    // failed history lookup counts as no history so the gate fails closed.
+    let history: RecipientSendStatus | null = null;
+    try {
+      history = await window.appBridge.sendHistory.getRecipientStatus(
+        result.review.destinationAddress,
+        account.network
+      );
+    } catch (error) {
+      console.error('Failed to look up recipient send history:', error);
+    }
+
+    if (!isActiveHardwareAccount(account)) {
+      return;
+    }
+
+    // Spendable balance from the same snapshot the preview was built on.
+    let spendableSats = 0n;
+    for (const utxo of result.review.utxos) {
+      spendableSats += getSpendableHardwareUtxoValue(utxo);
+    }
+
+    const recipient: RecipientContext = {
+      known: resolveAddress(result.review.destinationAddress),
+      history,
+      gate: evaluateSendGate({
+        amountSats: result.review.amountSats,
+        spendableBalanceSats: spendableSats,
+        recipient: {hasConfirmedSend: history?.hasConfirmedSend ?? false},
+      }),
+    };
+
+    if (recipient.gate.blocked) {
+      logHardwareWalletEvent(
+        'send:gate-blocked',
+        {
+          ...hardwareAccountLogContext(account),
+          amountSats: result.review.amountSats.toString(),
+          recipient: compactHardwareAddress(result.review.destinationAddress),
+        },
+        'warn'
+      );
+    }
+
+    dispatchSendStage({type: 'review-prepared', review: result.review, recipient});
+  };
+
+  const confirmSignTransaction = async () => {
+    if (!hardwareAddress || sendStage.step !== 'review' || sendStage.recipient.gate.blocked) {
+      return;
+    }
+
+    const {review, recipient} = sendStage;
+    dispatchSendStage({type: 'sign-started'});
     startSending();
 
     try {
-      await sendHardwareTransactionWorkflow({
-        account,
-        amountInput: sendAmount,
-        broadcastHardwareTransaction: request =>
-          window.appBridge.hardwareWallet.broadcastTransaction(request),
-        estimateFeeRate: () => refreshFeeRateForSend(account),
-        feeRatePrlPerKb: feeRate,
+      const result = await signHardwareSendFromReview({
+        review,
         fetchBalanceData: fetchHardwareWalletBalanceData,
         isActiveHardwareAccount,
-        recipientInput: sendAddress,
-        setBalanceData: setHardwareBalanceData,
-        setBalanceError,
-        setFeeRate,
-        setLastSendFee,
-        setSendAddress,
-        setSendAmount,
-        setSendError,
-        setSendSuccess,
-        utxos,
       });
+
+      if (result.status === 'stale') {
+        return;
+      }
+
+      if (result.status === 'invalidated') {
+        if (result.balance) {
+          setHardwareBalanceData(result.balance);
+        }
+        dispatchSendStage({type: 'stage-invalidated', message: result.message});
+        return;
+      }
+
+      if (result.status === 'error') {
+        dispatchSendStage({type: 'sign-failed', message: result.message});
+        return;
+      }
+
+      dispatchSendStage({type: 'sign-completed', snapshot: result.snapshot});
+
+      // First device-verified send to this contact: remember when.
+      const contact = recipient.known?.contact;
+      if (contact && !contact.firstVerifiedAt) {
+        updateContact(contact.id, {firstVerifiedAt: Date.now()}).catch(error => {
+          console.error('Failed to record contact verification date:', error);
+        });
+      }
     } finally {
       finishSending();
     }
   };
 
+  const approveBroadcast = async () => {
+    if (!hardwareAddress || sendStage.step !== 'signed') {
+      return;
+    }
+
+    const {snapshot} = sendStage;
+    dispatchSendStage({type: 'broadcast-started'});
+    startSending();
+
+    try {
+      const result = await broadcastApprovedHardwareSend({
+        snapshot,
+        broadcastHardwareTransaction: request =>
+          window.appBridge.hardwareWallet.broadcastTransaction(request),
+        fetchBalanceData: fetchHardwareWalletBalanceData,
+        isActiveHardwareAccount,
+      });
+
+      if (result.status === 'stale') {
+        return;
+      }
+
+      if (result.status === 'invalidated') {
+        if (result.balance) {
+          setHardwareBalanceData(result.balance);
+        }
+        dispatchSendStage({type: 'stage-invalidated', message: result.message});
+        return;
+      }
+
+      if (result.status === 'error') {
+        dispatchSendStage({type: 'broadcast-failed', message: result.message});
+        return;
+      }
+
+      setLastSendFee(formatSatsAsPearl(result.feeSats));
+      dispatchSendStage({type: 'broadcast-succeeded', txid: result.txid});
+
+      if (result.balance) {
+        setHardwareBalanceData(result.balance);
+        logHardwareWalletEvent('send:balance-refreshed', {
+          ...hardwareAccountLogContext(snapshot.review.account),
+          ...hardwareBalanceLogContext(result.balance.info, result.balance.utxos),
+        });
+      } else {
+        setBalanceError('Transaction broadcast. Refresh balance to update local Oyster status.');
+      }
+    } finally {
+      finishSending();
+    }
+  };
+
+  const cancelSendStage = () => {
+    if (sendStage.step === 'signed') {
+      // The signed transaction is discarded from memory, but the signature
+      // remains technically valid until its inputs move on-chain.
+      logHardwareWalletEvent(
+        'send:abandoned-signed',
+        hardwareAddress ? hardwareAccountLogContext(hardwareAddress) : {},
+        'warn'
+      );
+    }
+    dispatchSendStage({type: 'stage-cancelled'});
+  };
+
+  const applyTestAmount = () => {
+    if (sendStage.step !== 'review' || !sendStage.recipient.gate.blocked) {
+      return;
+    }
+
+    const testAmount = satsToPearlInput(sendStage.recipient.gate.suggestedTestAmountSats);
+    logHardwareWalletEvent('send:gate-test-amount', {amount: testAmount});
+    dispatchSendStage({type: 'stage-cancelled'});
+    setSendAmount(testAmount);
+    void beginSendReview(testAmount);
+  };
+
   const actions: HardwareWalletViewActions = {
     addHardwareAddress,
+    applyTestAmount,
+    approveBroadcast: () => {
+      void approveBroadcast();
+    },
     backfillHardwareAddress: () => {
       void backfillHardwareAddress();
+    },
+    beginSendReview: () => {
+      void beginSendReview();
+    },
+    cancelSendStage,
+    confirmSignTransaction: () => {
+      void confirmSignTransaction();
     },
     connectDevice: () => {
       void connectDevice();
@@ -738,9 +937,6 @@ export function useHardwareWalletController(): HardwareWalletViewProps {
     },
     selectAddressIndex,
     selectVendor,
-    sendHardwareTransaction: () => {
-      void sendHardwareTransaction();
-    },
     setSendAddress,
     setSendAmount,
     verifyReceiveAddress: () => {
@@ -804,6 +1000,7 @@ export function useHardwareWalletController(): HardwareWalletViewProps {
               sendAmount,
               sendError,
               sendPreview,
+              sendStage,
               sendSuccess,
             },
           }

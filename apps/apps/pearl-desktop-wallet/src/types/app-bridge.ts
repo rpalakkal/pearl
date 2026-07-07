@@ -83,16 +83,32 @@ interface Contact {
   id: string;
   name: string;
   address: string;
+  notes?: string;
+  publicKey?: string;
+  // Set the first time a hardware send to this contact passed review and was
+  // signed on a device; not user-editable.
+  firstVerifiedAt?: number;
   createdAt: number;
   updatedAt: number;
+}
+
+interface ContactExtras {
+  notes?: string;
+  publicKey?: string;
+}
+
+interface ContactUpdates extends ContactExtras {
+  name?: string;
+  address?: string;
+  firstVerifiedAt?: number;
 }
 
 interface ContactsApi {
   list: () => Promise<Contact[]>;
 
-  add: (name: string, address: string) => Promise<Contact>;
+  add: (name: string, address: string, extras?: ContactExtras) => Promise<Contact>;
 
-  update: (id: string, updates: {name?: string; address?: string}) => Promise<Contact>;
+  update: (id: string, updates: ContactUpdates) => Promise<Contact>;
 
   remove: (id: string) => Promise<void>;
 }
@@ -118,6 +134,10 @@ interface HardwareWalletBroadcastRequest {
   rawTransactionHex: string;
   sourceAddress: string;
   sourcePublicKey: string;
+  // Send-history metadata: main cannot cheaply decode the raw transaction, so
+  // the renderer supplies recipient and amount from its review snapshot.
+  recipientAddress?: string;
+  amountSats?: string;
 }
 
 interface HardwareWalletBroadcastResult {
@@ -131,6 +151,19 @@ interface HardwareWalletApi {
   broadcastTransaction: (
     request: HardwareWalletBroadcastRequest
   ) => Promise<HardwareWalletBroadcastResult>;
+}
+
+// Whether (and how) the user has previously sent to a recipient address.
+// Backs the large-send test-transaction gate.
+interface RecipientSendStatus {
+  hasAnySend: boolean;
+  hasConfirmedSend: boolean;
+  hasPendingSend: boolean;
+  lastSendAt: number | null;
+}
+
+interface SendHistoryApi {
+  getRecipientStatus: (address: string, network: AppNetwork) => Promise<RecipientSendStatus>;
 }
 
 interface ManagerApi {
@@ -239,6 +272,7 @@ interface AppBridge {
   wallet: Ipc<WalletApi>;
   hardwareWallet: Ipc<HardwareWalletApi>;
   contacts: Ipc<ContactsApi>;
+  sendHistory: Ipc<SendHistoryApi>;
   manager: Ipc<ManagerApi>;
   sync: Ipc<SyncApi>;
   update: UpdateApi;
@@ -256,7 +290,11 @@ export type {
   HardwareWalletBroadcastRequest,
   HardwareWalletBroadcastResult,
   Contact,
+  ContactExtras,
+  ContactUpdates,
   ContactsApi,
+  RecipientSendStatus,
+  SendHistoryApi,
   ManagerApi,
   SyncApi,
   SyncProgress,

@@ -6,7 +6,8 @@ import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
 import { randomUUID } from 'crypto';
-import type { Contact } from '../../types/app-bridge';
+import type { Contact, ContactExtras, ContactUpdates } from '../../types/app-bridge';
+import { isContact, isValidContactPublicKey, sanitizeContact } from './contact-validation';
 
 const SETTINGS_DIR = path.join(os.homedir(), '.pearl-wallet', 'settings');
 const CONTACTS_FILE = path.join(SETTINGS_DIR, 'contacts.json');
@@ -17,18 +18,6 @@ function ensureSettingsDir() {
   }
 }
 
-function isContact(value: unknown): value is Contact {
-  if (!value || typeof value !== 'object') {
-    return false;
-  }
-  const contact = value as Partial<Contact>;
-  return (
-    typeof contact.id === 'string' &&
-    typeof contact.name === 'string' &&
-    typeof contact.address === 'string'
-  );
-}
-
 function loadContacts(): Contact[] {
   ensureSettingsDir();
 
@@ -37,7 +26,7 @@ function loadContacts(): Contact[] {
       const data = fs.readFileSync(CONTACTS_FILE, 'utf-8');
       const parsed = JSON.parse(data);
       if (Array.isArray(parsed)) {
-        return parsed.filter(isContact);
+        return parsed.filter(isContact).map(sanitizeContact);
       }
     } catch (error) {
       console.error('Failed to load contacts:', error);
@@ -71,13 +60,42 @@ function assertValidContactInput(name: string, address: string) {
   }
 }
 
+// Applies optional contact fields to a record. Empty strings clear a field;
+// undefined leaves it untouched.
+function applyContactExtras(contact: Contact, extras: ContactUpdates) {
+  if (extras.notes !== undefined) {
+    const notes = extras.notes.trim();
+    if (notes) {
+      contact.notes = notes;
+    } else {
+      delete contact.notes;
+    }
+  }
+
+  if (extras.publicKey !== undefined) {
+    const publicKey = extras.publicKey.trim();
+    if (publicKey) {
+      if (!isValidContactPublicKey(publicKey)) {
+        throw new Error('Invalid public key: expected a hex encoded secp256k1 key');
+      }
+      contact.publicKey = publicKey;
+    } else {
+      delete contact.publicKey;
+    }
+  }
+
+  if (extras.firstVerifiedAt !== undefined) {
+    contact.firstVerifiedAt = extras.firstVerifiedAt;
+  }
+}
+
 export function listContacts(): Contact[] {
   return loadContacts().sort((left, right) =>
     left.name.localeCompare(right.name, undefined, { sensitivity: 'base' })
   );
 }
 
-export function addContact(name: string, address: string): Contact {
+export function addContact(name: string, address: string, extras: ContactExtras = {}): Contact {
   assertValidContactInput(name, address);
 
   const contacts = loadContacts();
@@ -93,16 +111,14 @@ export function addContact(name: string, address: string): Contact {
     createdAt: now,
     updatedAt: now,
   };
+  applyContactExtras(contact, extras);
 
   contacts.push(contact);
   saveContacts(contacts);
   return contact;
 }
 
-export function updateContact(
-  id: string,
-  updates: { name?: string; address?: string }
-): Contact {
+export function updateContact(id: string, updates: ContactUpdates): Contact {
   const contacts = loadContacts();
   const existing = contacts.find(contact => contact.id === id);
   if (!existing) {
@@ -124,6 +140,7 @@ export function updateContact(
 
   existing.name = name.trim();
   existing.address = address.trim();
+  applyContactExtras(existing, updates);
   existing.updatedAt = Date.now();
 
   saveContacts(contacts);

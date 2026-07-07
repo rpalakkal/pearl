@@ -109,6 +109,8 @@ async function hydrateUtxoConfirmations(
 }
 
 export const BlockbookClient = {
+  getTransactionConfirmations: getBlockbookTransactionConfirmations,
+
   async estimateFee(numBlocks: number, network?: BlockbookNetwork): Promise<number> {
     const normalizedNumBlocks = normalizeBlockbookFeeTarget(numBlocks);
     const data = await fetchBlockbookJson<{result: string | number}>(

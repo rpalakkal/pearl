@@ -2,6 +2,9 @@ import {ipcMain} from 'electron';
 import {ManagerService} from '../services/manager-service';
 import {BlockbookClient} from '../clients/blockbook-client';
 import {HardwareWalletService} from '../services/hardware-wallet-service/hardware-wallet-service.ts';
+import {getCurrentNetwork} from '../config/network-config';
+import {recordSend} from '../config/send-history';
+import {pearlAmountToSatsString} from '../config/send-history-model';
 import type {
   HardwareWalletAccountRequest,
   HardwareWalletBroadcastRequest,
@@ -18,8 +21,25 @@ function registerWalletIpc(ms: ManagerService) {
   );
   ipcMain.handle(
     'wallet-send-from-default-account',
-    (_event, toAddress: string, amount: number, feeRate: number) =>
-      ms.ensureWalletService().sendFromDefaultAccount(toAddress, amount, feeRate)
+    async (_event, toAddress: string, amount: number, feeRate: number) => {
+      const txid = await ms.ensureWalletService().sendFromDefaultAccount(toAddress, amount, feeRate);
+
+      // Record for the large-send gate; the transaction already broadcast, so
+      // a bookkeeping failure must never fail the send.
+      try {
+        recordSend({
+          recipientAddress: toAddress,
+          txid,
+          amountSats: pearlAmountToSatsString(amount),
+          network: getCurrentNetwork(),
+          source: 'software',
+        });
+      } catch (error) {
+        console.error('Failed to record send history:', error);
+      }
+
+      return txid;
+    }
   );
   ipcMain.handle('wallet-list-all-transactions', _event =>
     ms.ensureWalletService().listAllTransactions()

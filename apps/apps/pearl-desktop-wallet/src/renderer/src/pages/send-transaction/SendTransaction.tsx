@@ -11,6 +11,7 @@ import ErrorAlert from './ErrorAlert';
 import SuccessBanner from './SuccessBanner';
 import TransactionPreview from './TransactionPreview';
 import SendButton from './SendButton';
+import { SendConfirmDialog, type SendConfirmState } from './SendConfirmDialog';
 import { formatTxid } from '@/lib/crypto';
 import { getErrorMessage } from '@/lib/utils';
 
@@ -24,6 +25,8 @@ export default function SendTransaction() {
   const [success, setSuccess] = useState<string | null>(null);
   const [txid, setTxid] = useState<string | null>(null);
   const [isMaxSelected, setIsMaxSelected] = useState(false);
+  const [confirmState, setConfirmState] = useState<SendConfirmState | null>(null);
+  const [isSendingTx, setIsSendingTx] = useState(false);
 
   // Fee-related state
   const [feeLevel, setFeeLevel] = useState<FeeLevel>('fast');
@@ -43,42 +46,77 @@ export default function SendTransaction() {
       amount: '',
       address: '',
     },
+    // Field validators have passed by the time onSubmit fires; instead of
+    // sending immediately, open the confirmation dialog. The actual send
+    // happens in performSend after explicit confirmation.
     onSubmit: async ({ value }: { value: { amount: string; address: string } }) => {
       setError(null);
       setSuccess(null);
-      try {
-        const feeRate = estimatedFees[feeLevel];
-
-        const txId = await window.appBridge.wallet.sendFromDefaultAccount(
-          value.address.trim(),
-          parseFloat(value.amount),
-          feeRate,
-        );
-        setTxid(txId);
-        syncWalletData();
-        setSuccess('Transaction sent successfully!');
-        form.reset();
-      } catch (err) {
-        const errorMessage = getErrorMessage(err, 'Failed to send transaction');
-        // Check if wallet is locked (multiple possible error messages)
-        const isWalletLocked =
-          errorMessage.includes('walletpassphrase') ||
-          (errorMessage.includes('wallet') && errorMessage.includes('lock')) ||
-          errorMessage.includes('wallet is locked');
-
-        if (isWalletLocked) {
-          setError('Wallet is locked. Redirecting to unlock screen...');
-          setTimeout(() => {
-            navigate('/unlock');
-          }, 3000);
-        } else if (errorMessage.includes('mempool min fee not met')) {
-          setError('Seems like the transaction fee is too low. This often means that the transaction is too large. Try setting up smaller transactions.')
-        } else {
-          setError(errorMessage);
-        }
-      }
+      setConfirmState({
+        amount: value.amount.trim(),
+        address: value.address.trim(),
+        feeRate: estimatedFees[feeLevel],
+      });
     },
   });
+
+  async function performSend(confirm: SendConfirmState) {
+    setIsSendingTx(true);
+    setError(null);
+    setSuccess(null);
+    try {
+      const txId = await window.appBridge.wallet.sendFromDefaultAccount(
+        confirm.address,
+        parseFloat(confirm.amount),
+        confirm.feeRate,
+      );
+      setTxid(txId);
+      syncWalletData();
+      setSuccess('Transaction sent successfully!');
+      setConfirmState(null);
+      form.reset();
+    } catch (err) {
+      setConfirmState(null);
+      const errorMessage = getErrorMessage(err, 'Failed to send transaction');
+      // Check if wallet is locked (multiple possible error messages)
+      const isWalletLocked =
+        errorMessage.includes('walletpassphrase') ||
+        (errorMessage.includes('wallet') && errorMessage.includes('lock')) ||
+        errorMessage.includes('wallet is locked');
+
+      if (isWalletLocked) {
+        setError('Wallet is locked. Redirecting to unlock screen...');
+        setTimeout(() => {
+          navigate('/unlock');
+        }, 3000);
+      } else if (errorMessage.includes('mempool min fee not met')) {
+        setError('Seems like the transaction fee is too low. This often means that the transaction is too large. Try setting up smaller transactions.')
+      } else {
+        setError(errorMessage);
+      }
+    } finally {
+      setIsSendingTx(false);
+    }
+  }
+
+  // A validator that throws (e.g. address validation while the wallet
+  // service is down) puts the raw Error into the field's errors; rendering
+  // that object as a React child crashes the page, so coerce to a string.
+  function firstFieldError(rawErrors: unknown[]): string | null {
+    const first = rawErrors.find(Boolean);
+    if (!first) {
+      return null;
+    }
+    return typeof first === 'string' ? first : getErrorMessage(first, 'Validation failed');
+  }
+
+  function useTestAmount(amount: string) {
+    setConfirmState(null);
+    form.setFieldValue('amount', amount);
+    setIsMaxSelected(false);
+    // Re-run submission so the dialog reopens with the test amount.
+    void form.handleSubmit();
+  }
 
   // Fetch fee estimates
   async function fetchEstimatedFees() {
@@ -174,8 +212,7 @@ export default function SendTransaction() {
                 }}
               >
                 {field => {
-                  const rawErrors = field.state.meta?.errors ?? [];
-                  const firstError = (rawErrors.find(Boolean) ?? null) as string | null;
+                  const firstError = firstFieldError(field.state.meta?.errors ?? []);
                   return (
                     <AmountInput
                       amount={field.state.value}
@@ -204,8 +241,7 @@ export default function SendTransaction() {
                 }}
               >
                 {field => {
-                  const rawErrors = field.state.meta?.errors ?? [];
-                  const firstError = (rawErrors.find(Boolean) ?? null) as string | null;
+                  const firstError = firstFieldError(field.state.meta?.errors ?? []);
                   return (
                     <AddressInput
                       address={field.state.value}
@@ -255,8 +291,8 @@ export default function SendTransaction() {
                     )}
                     <SendButton
                       onClick={() => form.handleSubmit()}
-                      isLoading={isSubmitting}
-                      disabled={isSubmitting || !amount || !address || !!error || !isValid}
+                      isLoading={isSubmitting || isSendingTx}
+                      disabled={isSubmitting || isSendingTx || !amount || !address || !!error || !isValid}
                     />
                   </>
                 )}
@@ -265,6 +301,25 @@ export default function SendTransaction() {
           </div>
         </div>
       </div>
+
+      {confirmState && (
+        <SendConfirmDialog
+          confirm={confirmState}
+          spendableAmount={spendableAmount}
+          isSending={isSendingTx}
+          onCancel={() => {
+            if (!isSendingTx) {
+              setConfirmState(null);
+            }
+          }}
+          onConfirm={() => {
+            if (confirmState) {
+              void performSend(confirmState);
+            }
+          }}
+          onUseTestAmount={useTestAmount}
+        />
+      )}
     </div>
   );
 }

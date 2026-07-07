@@ -3,6 +3,7 @@ import {createPortal} from 'react-dom';
 import {AlertCircle, Pencil, Search, Trash2, UserPlus, X} from 'lucide-react';
 import {Button} from '@/components/ui/button';
 import {getErrorMessage} from '@/lib/utils';
+import {getBitcoinDeviceDisplayAddress} from '../../lib/hardwareWallet.ts';
 import {useContactsStore} from '../../store/contactsStore';
 import {useAddressBook, validatePearlAddress, type KnownAddress} from './useAddressBook';
 import type {Contact} from '../../../../types/app-bridge';
@@ -24,6 +25,20 @@ export function truncateAddress(address: string): string {
   return `${address.slice(0, 14)}…${address.slice(-8)}`;
 }
 
+// The BTC-form address a hardware device would display for this Pearl
+// address. Derived, never stored; null when the address is not a valid
+// Pearl Taproot address on either network.
+export function deriveBtcDisplayAddress(address: string): string | null {
+  for (const network of ['mainnet', 'testnet'] as const) {
+    try {
+      return getBitcoinDeviceDisplayAddress(address.trim(), network);
+    } catch {
+      // try the next network
+    }
+  }
+  return null;
+}
+
 export function AddressBookDialog({
   isOpen,
   onClose,
@@ -38,6 +53,8 @@ export function AddressBookDialog({
   const [search, setSearch] = useState('');
   const [formName, setFormName] = useState('');
   const [formAddress, setFormAddress] = useState('');
+  const [formNotes, setFormNotes] = useState('');
+  const [formPublicKey, setFormPublicKey] = useState('');
   const [formError, setFormError] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
@@ -48,6 +65,8 @@ export function AddressBookDialog({
       setSearch('');
       setFormName('');
       setFormAddress(initialMode === 'add' ? initialAddress : '');
+      setFormNotes('');
+      setFormPublicKey('');
       setFormError(null);
       setPendingDeleteId(null);
     }
@@ -70,6 +89,8 @@ export function AddressBookDialog({
     setView({mode: 'add'});
     setFormName('');
     setFormAddress('');
+    setFormNotes('');
+    setFormPublicKey('');
     setFormError(null);
   }
 
@@ -77,6 +98,8 @@ export function AddressBookDialog({
     setView({mode: 'edit', contact});
     setFormName(contact.name);
     setFormAddress(contact.address);
+    setFormNotes(contact.notes ?? '');
+    setFormPublicKey(contact.publicKey ?? '');
     setFormError(null);
   }
 
@@ -122,9 +145,14 @@ export function AddressBookDialog({
       }
 
       if (view.mode === 'edit') {
-        await updateContact(view.contact.id, {name: formName, address: formAddress});
+        await updateContact(view.contact.id, {
+          name: formName,
+          address: formAddress,
+          notes: formNotes,
+          publicKey: formPublicKey,
+        });
       } else {
-        await addContact(formName, formAddress);
+        await addContact(formName, formAddress, {notes: formNotes, publicKey: formPublicKey});
       }
       setView({mode: 'list'});
     } catch (err) {
@@ -181,7 +209,51 @@ export function AddressBookDialog({
                 placeholder="prl1..."
                 className="w-full rounded-lg border border-gray-300 px-3 py-2 font-mono text-sm text-gray-900 focus:border-green-500 focus:outline-none focus:ring-2 focus:ring-green-500/20"
               />
+              {(() => {
+                const btcDisplayAddress = formAddress.trim()
+                  ? deriveBtcDisplayAddress(formAddress)
+                  : null;
+                return btcDisplayAddress ? (
+                  <div className="mt-1 text-xs text-gray-500">
+                    Hardware devices display this as{' '}
+                    <span className="break-all font-mono">{btcDisplayAddress}</span>
+                  </div>
+                ) : null;
+              })()}
             </div>
+
+            <div>
+              <label className="mb-1 block text-sm font-medium text-gray-700">
+                Notes <span className="font-normal text-gray-400">(optional)</span>
+              </label>
+              <textarea
+                value={formNotes}
+                onChange={e => setFormNotes(e.target.value)}
+                placeholder="e.g. cold storage, exchange deposit…"
+                rows={2}
+                className="w-full resize-none rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 focus:border-green-500 focus:outline-none focus:ring-2 focus:ring-green-500/20"
+              />
+            </div>
+
+            <div>
+              <label className="mb-1 block text-sm font-medium text-gray-700">
+                Public Key <span className="font-normal text-gray-400">(optional)</span>
+              </label>
+              <input
+                type="text"
+                value={formPublicKey}
+                onChange={e => setFormPublicKey(e.target.value)}
+                placeholder="hex encoded secp256k1 key"
+                className="w-full rounded-lg border border-gray-300 px-3 py-2 font-mono text-sm text-gray-900 focus:border-green-500 focus:outline-none focus:ring-2 focus:ring-green-500/20"
+              />
+            </div>
+
+            {view.mode === 'edit' && view.contact.firstVerifiedAt && (
+              <div className="text-xs text-gray-500">
+                First verified on a hardware send:{' '}
+                {new Date(view.contact.firstVerifiedAt).toLocaleDateString()}
+              </div>
+            )}
 
             {formError && (
               <div className="flex items-center gap-1 rounded border border-red-700/30 px-2 py-1 text-xs text-red-500">

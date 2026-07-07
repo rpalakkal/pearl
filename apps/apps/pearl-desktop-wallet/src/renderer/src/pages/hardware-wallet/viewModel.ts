@@ -7,6 +7,7 @@ import type {
 } from '../../lib/hardwareWallet.ts';
 import type {HardwareAddressSelectorOption} from '../../lib/hardwareWalletStorage.ts';
 import type {AddressBackfillStatus} from '../../../../types/app-bridge.ts';
+import type {HardwareSendStage} from './useHardwareSendFormState.ts';
 
 export type SendPreviewState =
   | {preview: HardwarePearlSendPreview; error: null}
@@ -91,6 +92,7 @@ export interface HardwareWalletSendModel {
   sendAmount: string;
   sendError: string | null;
   sendPreview: SendPreviewState;
+  sendStage: HardwareSendStage;
   sendSuccess: string | null;
 }
 
@@ -111,7 +113,12 @@ export interface HardwareWalletViewModel {
 
 export interface HardwareWalletViewActions {
   addHardwareAddress: () => void;
+  applyTestAmount: () => void;
+  approveBroadcast: () => void;
   backfillHardwareAddress: () => void;
+  beginSendReview: () => void;
+  cancelSendStage: () => void;
+  confirmSignTransaction: () => void;
   connectDevice: () => void;
   copyToClipboard: (text: string) => void;
   forgetHardwareAccount: () => void;
@@ -119,7 +126,6 @@ export interface HardwareWalletViewActions {
   loadHardwareWalletBalance: (account: HardwareWalletAddress) => void;
   selectAddressIndex: (addressIndex: number) => void;
   selectVendor: (vendor: HardwareWalletVendor) => void;
-  sendHardwareTransaction: () => void;
   setSendAddress: (value: string) => void;
   setSendAmount: (value: string) => void;
   verifyReceiveAddress: () => void;

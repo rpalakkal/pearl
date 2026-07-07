@@ -10,6 +10,7 @@ import {
   type BlockbookUtxo,
 } from '../../clients/blockbook-normalizers.ts';
 import {BlockbookClient} from '../../clients/blockbook-client.ts';
+import {recordSend} from '../../config/send-history.ts';
 import type {WalletService} from '../wallet-service/wallet-service.ts';
 import type {ListUnspentResult} from '../wallet-service/wallet-rpc-methods.ts';
 import type {
@@ -164,6 +165,8 @@ export const HardwareWalletService = {
       rawTransactionHex,
       sourceAddress,
       sourcePublicKey,
+      recipientAddress,
+      amountSats,
     }: HardwareWalletBroadcastRequest,
     walletService: WalletService | null
   ): Promise<HardwareWalletBroadcastResult> {
@@ -183,6 +186,23 @@ export const HardwareWalletService = {
     }
 
     const txid = normalizeBlockbookTxid(rawTxid, 'broadcast transaction id');
+
+    // Record for the large-send gate when the renderer supplied metadata; the
+    // transaction already broadcast, so bookkeeping failures are only logged.
+    if (recipientAddress) {
+      try {
+        recordSend({
+          recipientAddress,
+          txid,
+          amountSats: amountSats ?? '0',
+          network: account.network,
+          source: 'hardware',
+        });
+      } catch (error) {
+        console.error('Failed to record hardware send history:', error);
+      }
+    }
+
     let balance: HardwareWalletBalance | null = null;
 
     try {

@@ -1,9 +1,10 @@
 import {
-  formatSatsAsPearl,
   getHardwareWalletErrorMessage,
   parsePearlAmountToSats,
   previewHardwarePearlSend,
   signHardwarePearlTransaction,
+  type HardwarePearlSendPreview,
+  type HardwarePearlSignedTransaction,
   type HardwareWalletAddress,
   type PearlNetwork,
 } from '../../lib/hardwareWallet.ts';
@@ -27,72 +28,85 @@ import type {HardwareWalletBalanceData} from './balanceData.ts';
 export const PENDING_OUTGOING_HARDWARE_SEND_MESSAGE =
   'A hardware wallet transaction is pending. Wait for it to confirm before sending again.';
 
-export interface SendHardwareTransactionWorkflowParams {
+const PREVIEW_CHANGED_MESSAGE =
+  'Balance or fee estimate changed. Review the updated preview before signing.';
+
+const STATE_CHANGED_SINCE_SIGNING_MESSAGE =
+  'Wallet state changed since signing. The signed transaction was discarded; start a new send.';
+
+// Everything the Review step showed the user, frozen so the later stages can
+// verify nothing drifted before the transaction is signed and broadcast.
+export interface HardwareSendReviewSnapshot {
   account: HardwareWalletAddress;
-  amountInput: string;
-  broadcastHardwareTransaction: (
-    request: HardwareWalletBroadcastRequest
-  ) => Promise<HardwareWalletBroadcastResult>;
-  estimateFeeRate: (network: PearlNetwork) => Promise<number | null>;
+  destinationAddress: string;
+  amountSats: bigint;
   feeRatePrlPerKb: number;
-  fetchBalanceData: (account: HardwareWalletAddress) => Promise<HardwareWalletBalanceData>;
-  isActiveHardwareAccount: (account: HardwareWalletAddress) => boolean;
-  recipientInput: string;
-  setBalanceData: (balance: HardwareWalletBalanceData) => void;
-  setBalanceError: (message: string) => void;
-  setFeeRate: (feeRate: number) => void;
-  setLastSendFee: (fee: string) => void;
-  setSendAddress: (value: string) => void;
-  setSendAmount: (value: string) => void;
-  setSendError: (message: string) => void;
-  setSendSuccess: (txid: string) => void;
+  preview: HardwarePearlSendPreview;
   utxos: BlockbookUtxo[];
+  createdAt: number;
 }
 
-export async function sendHardwareTransactionWorkflow({
-  account,
-  amountInput,
-  broadcastHardwareTransaction,
-  estimateFeeRate,
-  feeRatePrlPerKb,
-  fetchBalanceData,
-  isActiveHardwareAccount,
-  recipientInput,
-  setBalanceData,
-  setBalanceError,
-  setFeeRate,
-  setLastSendFee,
-  setSendAddress,
-  setSendAmount,
-  setSendError,
-  setSendSuccess,
-  utxos,
-}: SendHardwareTransactionWorkflowParams): Promise<void> {
+export interface HardwareSendSignedSnapshot {
+  review: HardwareSendReviewSnapshot;
+  // Held in renderer memory only and never persisted: the signature remains
+  // valid for its inputs until those coins move.
+  signed: HardwarePearlSignedTransaction;
+}
+
+interface WorkflowDeps {
+  fetchBalanceData: (account: HardwareWalletAddress) => Promise<HardwareWalletBalanceData>;
+  isActiveHardwareAccount: (account: HardwareWalletAddress) => boolean;
+}
+
+export type PrepareHardwareSendReviewResult =
+  | {status: 'ok'; review: HardwareSendReviewSnapshot; balance: HardwareWalletBalanceData}
+  | {
+      status: 'error';
+      message: string;
+      balance?: HardwareWalletBalanceData;
+      feeRate?: number;
+    }
+  | {status: 'stale'};
+
+// Stage A: builds the Review snapshot. Runs the same safety pipeline the
+// one-shot send used: preview on current utxos, fresh balance fetch,
+// pending-outgoing guard, fee-rate refresh, and a preview-equality check.
+export async function prepareHardwareSendReview(
+  params: WorkflowDeps & {
+    account: HardwareWalletAddress;
+    amountInput: string;
+    recipientInput: string;
+    feeRatePrlPerKb: number;
+    utxos: BlockbookUtxo[];
+    estimateFeeRate: (network: PearlNetwork) => Promise<number | null>;
+  }
+): Promise<PrepareHardwareSendReviewResult> {
+  const {account, isActiveHardwareAccount} = params;
+
   try {
-    const amountSats = parsePearlAmountToSats(amountInput);
-    const destinationAddress = recipientInput.trim();
-    logHardwareWalletEvent('send:start', {
+    const amountSats = parsePearlAmountToSats(params.amountInput);
+    const destinationAddress = params.recipientInput.trim();
+    logHardwareWalletEvent('send:review', {
       ...hardwareAccountLogContext(account),
       amountSats: amountSats.toString(),
       recipient: compactHardwareAddress(destinationAddress),
-      feeRatePrlPerKb: feeRatePrlPerKb.toFixed(8),
+      feeRatePrlPerKb: params.feeRatePrlPerKb.toFixed(8),
     });
-    const currentPreview = previewHardwarePearlSend({
+
+    const initialPreview = previewHardwarePearlSend({
       account,
       destinationAddress,
       amountSats,
-      feeRatePrlPerKb,
-      utxos,
+      feeRatePrlPerKb: params.feeRatePrlPerKb,
+      utxos: params.utxos,
     });
-    logHardwareWalletEvent('send:preview', hardwareSendPreviewLogContext(currentPreview));
-    const latestBalance = await fetchBalanceData(account);
 
+    const latestBalance = await params.fetchBalanceData(account);
     if (!isActiveHardwareAccount(account)) {
-      return;
+      return {status: 'stale'};
     }
 
     if (hasPendingOutgoingHardwareTransaction(latestBalance.info)) {
-      setBalanceData(latestBalance);
       logHardwareWalletEvent(
         'send:pending-outgoing',
         {
@@ -101,11 +115,19 @@ export async function sendHardwareTransactionWorkflow({
         },
         'warn'
       );
-      throw new Error(PENDING_OUTGOING_HARDWARE_SEND_MESSAGE);
+      return {
+        status: 'error',
+        message: PENDING_OUTGOING_HARDWARE_SEND_MESSAGE,
+        balance: latestBalance,
+      };
     }
 
-    const refreshedFeeRate = await estimateFeeRate(account.network);
-    const nextFeeRate = refreshedFeeRate ?? feeRatePrlPerKb;
+    const refreshedFeeRate = await params.estimateFeeRate(account.network);
+    if (!isActiveHardwareAccount(account)) {
+      return {status: 'stale'};
+    }
+
+    const nextFeeRate = refreshedFeeRate ?? params.feeRatePrlPerKb;
     const latestPreview = previewHardwarePearlSend({
       account,
       destinationAddress,
@@ -113,99 +135,147 @@ export async function sendHardwareTransactionWorkflow({
       feeRatePrlPerKb: nextFeeRate,
       utxos: latestBalance.utxos,
     });
-    logHardwareWalletEvent('send:refreshed-preview', {
-      ...hardwareSendPreviewLogContext(latestPreview),
-      ...hardwareBalanceLogContext(latestBalance.info, latestBalance.utxos),
-    });
 
-    if (!isActiveHardwareAccount(account)) {
-      return;
-    }
-
-    setBalanceData(latestBalance);
-    setFeeRate(nextFeeRate);
-
-    if (!sendPreviewsEqual(currentPreview, latestPreview)) {
+    if (!sendPreviewsEqual(initialPreview, latestPreview)) {
       logHardwareWalletEvent(
         'send:preview-changed',
         {
-          beforeFeeSats: currentPreview.feeSats.toString(),
+          beforeFeeSats: initialPreview.feeSats.toString(),
           afterFeeSats: latestPreview.feeSats.toString(),
-          beforeInputs: currentPreview.inputCount,
+          beforeInputs: initialPreview.inputCount,
           afterInputs: latestPreview.inputCount,
         },
         'warn'
       );
-      throw new Error(
-        'Balance or fee estimate changed. Review the updated preview before signing.'
-      );
+      return {
+        status: 'error',
+        message: PREVIEW_CHANGED_MESSAGE,
+        balance: latestBalance,
+        feeRate: nextFeeRate,
+      };
     }
 
-    logHardwareWalletEvent('send:signature-request', hardwareSendPreviewLogContext(latestPreview));
-    const signedTransaction = await signHardwarePearlTransaction({
+    return {
+      status: 'ok',
+      balance: latestBalance,
+      review: {
+        account,
+        destinationAddress,
+        amountSats,
+        feeRatePrlPerKb: nextFeeRate,
+        preview: latestPreview,
+        utxos: latestBalance.utxos,
+        createdAt: Date.now(),
+      },
+    };
+  } catch (error) {
+    if (!isActiveHardwareAccount(account)) {
+      return {status: 'stale'};
+    }
+
+    console.error('Failed to prepare hardware send review:', error);
+    logHardwareWalletEvent(
+      'send:review-error',
+      {
+        ...hardwareAccountLogContext(account),
+        error: getErrorLogMessage(error),
+      },
+      'error'
+    );
+    return {status: 'error', message: getHardwareWalletErrorMessage(error, account.vendor)};
+  }
+}
+
+export type SignHardwareSendResult =
+  | {status: 'ok'; snapshot: HardwareSendSignedSnapshot}
+  | {status: 'invalidated'; message: string; balance?: HardwareWalletBalanceData}
+  | {status: 'error'; message: string}
+  | {status: 'stale'};
+
+// Stage B: re-validates the Review snapshot against fresh wallet state
+// immediately before asking the device to sign, then signs. Does NOT
+// broadcast.
+export async function signHardwareSendFromReview(
+  params: WorkflowDeps & {
+    review: HardwareSendReviewSnapshot;
+    signTransaction?: typeof signHardwarePearlTransaction;
+  }
+): Promise<SignHardwareSendResult> {
+  const {review, isActiveHardwareAccount} = params;
+  const {account} = review;
+
+  try {
+    const latestBalance = await params.fetchBalanceData(account);
+    if (!isActiveHardwareAccount(account)) {
+      return {status: 'stale'};
+    }
+
+    if (hasPendingOutgoingHardwareTransaction(latestBalance.info)) {
+      logHardwareWalletEvent(
+        'send:sign-invalidated',
+        {...hardwareAccountLogContext(account), reason: 'pending-outgoing'},
+        'warn'
+      );
+      return {
+        status: 'invalidated',
+        message: PENDING_OUTGOING_HARDWARE_SEND_MESSAGE,
+        balance: latestBalance,
+      };
+    }
+
+    const freshPreview = previewHardwarePearlSend({
       account,
-      destinationAddress,
-      amountSats,
-      feeRatePrlPerKb: nextFeeRate,
+      destinationAddress: review.destinationAddress,
+      amountSats: review.amountSats,
+      feeRatePrlPerKb: review.feeRatePrlPerKb,
+      utxos: latestBalance.utxos,
+    });
+
+    if (!sendPreviewsEqual(review.preview, freshPreview)) {
+      logHardwareWalletEvent(
+        'send:sign-invalidated',
+        {
+          ...hardwareAccountLogContext(account),
+          reason: 'preview-drift',
+          beforeFeeSats: review.preview.feeSats.toString(),
+          afterFeeSats: freshPreview.feeSats.toString(),
+        },
+        'warn'
+      );
+      return {status: 'invalidated', message: PREVIEW_CHANGED_MESSAGE, balance: latestBalance};
+    }
+
+    logHardwareWalletEvent(
+      'send:signature-request',
+      hardwareSendPreviewLogContext(review.preview)
+    );
+    const signTransaction = params.signTransaction ?? signHardwarePearlTransaction;
+    const signed = await signTransaction({
+      account,
+      destinationAddress: review.destinationAddress,
+      amountSats: review.amountSats,
+      feeRatePrlPerKb: review.feeRatePrlPerKb,
       utxos: latestBalance.utxos,
     });
 
     if (!isActiveHardwareAccount(account)) {
-      return;
+      return {status: 'stale'};
     }
 
     logHardwareWalletEvent('send:signed', {
       ...hardwareAccountLogContext(account),
-      feeSats: signedTransaction.feeSats.toString(),
-      changeSats: signedTransaction.changeSats.toString(),
-      inputs: signedTransaction.inputCount,
+      feeSats: signed.feeSats.toString(),
+      changeSats: signed.changeSats.toString(),
+      inputs: signed.inputCount,
     });
 
-    const broadcastResult = await broadcastHardwareTransaction({
-      network: account.network,
-      rawTransactionHex: signedTransaction.rawTransactionHex,
-      sourceAddress: account.address,
-      sourcePublicKey: account.publicKey,
-    });
-
-    if (!isActiveHardwareAccount(account)) {
-      return;
-    }
-
-    setSendAmount('');
-    setSendAddress('');
-    setSendSuccess(broadcastResult.txid);
-    setLastSendFee(formatSatsAsPearl(signedTransaction.feeSats));
-    logHardwareWalletEvent('send:broadcast', {
-      ...hardwareAccountLogContext(account),
-      txid: broadcastResult.txid,
-      feeSats: signedTransaction.feeSats.toString(),
-    });
-
-    if (broadcastResult.balance) {
-      setBalanceData(broadcastResult.balance);
-      logHardwareWalletEvent('send:balance-refreshed', {
-        ...hardwareAccountLogContext(account),
-        ...hardwareBalanceLogContext(broadcastResult.balance.info, broadcastResult.balance.utxos),
-      });
-      return;
-    }
-
-    logHardwareWalletEvent(
-      'send:balance-refresh-error',
-      {
-        ...hardwareAccountLogContext(account),
-        error: 'Local Oyster balance refresh unavailable after broadcast',
-      },
-      'warn'
-    );
-    setBalanceError('Transaction broadcast. Refresh balance to update local Oyster status.');
+    return {status: 'ok', snapshot: {review, signed}};
   } catch (error) {
     if (!isActiveHardwareAccount(account)) {
-      return;
+      return {status: 'stale'};
     }
 
-    console.error('Failed to send hardware wallet transaction:', error);
+    console.error('Failed to sign hardware wallet transaction:', error);
     logHardwareWalletEvent(
       'send:error',
       {
@@ -214,6 +284,104 @@ export async function sendHardwareTransactionWorkflow({
       },
       'error'
     );
-    setSendError(getHardwareWalletErrorMessage(error, account.vendor));
+    return {status: 'error', message: getHardwareWalletErrorMessage(error, account.vendor)};
+  }
+}
+
+export type BroadcastApprovedSendResult =
+  | {
+      status: 'ok';
+      txid: string;
+      feeSats: bigint;
+      balance: HardwareWalletBalanceData | null;
+    }
+  | {status: 'invalidated'; message: string; balance?: HardwareWalletBalanceData}
+  | {status: 'error'; message: string}
+  | {status: 'stale'};
+
+// Stage C: after explicit user approval, re-checks that the wallet state the
+// transaction was signed against still holds (no new pending outgoing tx,
+// every selected input still unspent), then broadcasts.
+export async function broadcastApprovedHardwareSend(
+  params: WorkflowDeps & {
+    snapshot: HardwareSendSignedSnapshot;
+    broadcastHardwareTransaction: (
+      request: HardwareWalletBroadcastRequest
+    ) => Promise<HardwareWalletBroadcastResult>;
+  }
+): Promise<BroadcastApprovedSendResult> {
+  const {snapshot, isActiveHardwareAccount} = params;
+  const {review, signed} = snapshot;
+  const {account} = review;
+
+  try {
+    const latestBalance = await params.fetchBalanceData(account);
+    if (!isActiveHardwareAccount(account)) {
+      return {status: 'stale'};
+    }
+
+    const freshOutpoints = new Set(
+      latestBalance.utxos.map(utxo => `${utxo.txid}:${utxo.vout}`)
+    );
+    const inputsStillPresent = review.preview.selectedOutpoints.every(outpoint =>
+      freshOutpoints.has(`${outpoint.txid}:${outpoint.vout}`)
+    );
+
+    if (hasPendingOutgoingHardwareTransaction(latestBalance.info) || !inputsStillPresent) {
+      logHardwareWalletEvent(
+        'send:approve-invalidated',
+        {
+          ...hardwareAccountLogContext(account),
+          reason: inputsStillPresent ? 'pending-outgoing' : 'inputs-missing',
+        },
+        'warn'
+      );
+      return {
+        status: 'invalidated',
+        message: STATE_CHANGED_SINCE_SIGNING_MESSAGE,
+        balance: latestBalance,
+      };
+    }
+
+    const broadcastResult = await params.broadcastHardwareTransaction({
+      network: account.network,
+      rawTransactionHex: signed.rawTransactionHex,
+      sourceAddress: account.address,
+      sourcePublicKey: account.publicKey,
+      recipientAddress: review.destinationAddress,
+      amountSats: review.amountSats.toString(),
+    });
+
+    if (!isActiveHardwareAccount(account)) {
+      return {status: 'stale'};
+    }
+
+    logHardwareWalletEvent('send:broadcast', {
+      ...hardwareAccountLogContext(account),
+      txid: broadcastResult.txid,
+      feeSats: signed.feeSats.toString(),
+    });
+
+    return {
+      status: 'ok',
+      txid: broadcastResult.txid,
+      feeSats: signed.feeSats,
+      balance: broadcastResult.balance,
+    };
+  } catch (error) {
+    if (!isActiveHardwareAccount(account)) {
+      return {status: 'stale'};
+    }
+
+    console.error('Failed to broadcast hardware wallet transaction:', error);
+    logHardwareWalletEvent(
+      'send:error',
+      {
+        ...hardwareAccountLogContext(account),
+        error: getErrorLogMessage(error),
+      },
+      'error'
+    );
+    return {status: 'error', message: getHardwareWalletErrorMessage(error, account.vendor)};
   }
 }
