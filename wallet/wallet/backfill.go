@@ -29,6 +29,14 @@ const (
 // means sustained peer starvation.
 const backfillMaxBatchAttempts = 5
 
+// backfillNamespaceKey is the wallet db bucket recording, per encoded
+// address, the height a completed backfill scanned through. Persisting the
+// watermark matters because each wallet has its own transaction store: an
+// address imported into several wallets must be backfilled in each, and
+// "the key is already imported" is not evidence that THIS wallet ever
+// scanned its history.
+var backfillNamespaceKey = []byte("addrbackfill")
+
 // BackfillJobStatus describes the progress of an explicit address backfill
 // started with StartAddressBackfill. Job state is kept in memory for the
 // lifetime of the wallet process; the transactions a backfill discovers are
@@ -130,6 +138,48 @@ func (w *Wallet) mutateBackfillJob(address string,
 	if job, ok := w.backfillJobs[address]; ok {
 		fn(job)
 		job.UpdatedAt = time.Now()
+	}
+}
+
+// BackfilledThrough returns the height a completed backfill for the address
+// scanned through in this wallet, if any.
+func (w *Wallet) BackfilledThrough(address string) (int32, bool) {
+	var height int32
+	found := false
+
+	_ = walletdb.View(w.db, func(tx walletdb.ReadTx) error {
+		bucket := tx.ReadBucket(backfillNamespaceKey)
+		if bucket == nil {
+			return nil
+		}
+		value := bucket.Get([]byte(address))
+		if len(value) != 4 {
+			return nil
+		}
+		height = int32(uint32(value[0])<<24 | uint32(value[1])<<16 |
+			uint32(value[2])<<8 | uint32(value[3]))
+		found = true
+		return nil
+	})
+
+	return height, found
+}
+
+func (w *Wallet) recordBackfilledThrough(address string, height int32) {
+	err := walletdb.Update(w.db, func(tx walletdb.ReadWriteTx) error {
+		bucket, err := tx.CreateTopLevelBucket(backfillNamespaceKey)
+		if err != nil {
+			return err
+		}
+		value := []byte{
+			byte(uint32(height) >> 24), byte(uint32(height) >> 16),
+			byte(uint32(height) >> 8), byte(uint32(height)),
+		}
+		return bucket.Put([]byte(address), value)
+	})
+	if err != nil {
+		log.Errorf("Unable to persist backfill watermark for %v: %v",
+			address, err)
 	}
 }
 
@@ -271,6 +321,7 @@ func (w *Wallet) runAddressBackfill(addr btcutil.Address, startHeight int32) {
 		job.Status = BackfillStatusComplete
 		job.CurrentHeight = bestHeight
 	})
+	w.recordBackfilledThrough(encodedAddr, bestHeight)
 
 	log.Infof("Backfill for address %v finished: scanned blocks %d-%d in %v",
 		encodedAddr, startHeight, bestHeight, time.Since(start))

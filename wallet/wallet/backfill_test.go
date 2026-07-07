@@ -456,3 +456,54 @@ func TestAddressHistoryClassifiesFromAddressPerspective(t *testing.T) {
 	require.Equal(t, btcutil.Amount(60_000), spend.Amount)
 	require.Equal(t, btcutil.Amount(40_000), spend.Fee)
 }
+
+func TestBackfillWatermarkPersistsAndGatesReimports(t *testing.T) {
+	w, cleanup := testWallet(t)
+	defer cleanup()
+
+	chainClient := &scriptedChainClient{current: true, bestHeight: 10}
+	w.chainClient = chainClient
+
+	addr := testAddress(t, w)
+	encoded := addr.EncodeAddress()
+
+	// No watermark before any backfill.
+	_, done := w.BackfilledThrough(encoded)
+	require.False(t, done)
+
+	_, err := w.StartAddressBackfill(addr, 0)
+	require.NoError(t, err)
+	waitForJob(t, w, encoded, BackfillStatusComplete)
+
+	height, done := w.BackfilledThrough(encoded)
+	require.True(t, done)
+	require.Equal(t, int32(10), height)
+
+	// A failed job must not record a watermark. Derive the second address
+	// before injecting the failure (derivation itself subscribes).
+	other := deriveSecondAddress(t, w)
+
+	chainClient.mtx.Lock()
+	chainClient.notifyErr = errors.New("subscribe down")
+	chainClient.mtx.Unlock()
+
+	_, err = w.StartAddressBackfill(other, 0)
+	require.NoError(t, err)
+	deadline := time.Now().Add(10 * time.Second)
+	for time.Now().Before(deadline) {
+		status, ok := w.BackfillStatus(other.EncodeAddress())
+		if ok && status.Status == BackfillStatusFailed {
+			break
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+	_, done = w.BackfilledThrough(other.EncodeAddress())
+	require.False(t, done)
+}
+
+func deriveSecondAddress(t *testing.T, w *Wallet) btcutil.Address {
+	t.Helper()
+	addr, err := w.NewAddress(0, waddrmgr.KeyScopeBIP0086, false)
+	require.NoError(t, err)
+	return addr
+}

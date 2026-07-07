@@ -337,8 +337,6 @@ func (w *Wallet) ImportPublicKey(pubKey *btcec.PublicKey,
 	}
 
 	if isDuplicate {
-		// A rescan is intentionally not repeated for duplicates; the
-		// first import already scheduled one when requested.
 		log.Debugf("Public key for address %v already imported", address)
 	}
 
@@ -348,16 +346,23 @@ func (w *Wallet) ImportPublicKey(pubKey *btcec.PublicKey,
 			"notifications: %w", err)
 	}
 
-	if rescan && !isDuplicate {
+	if rescan {
 		// Backfill from genesis so outputs received before the import
 		// are discovered. Runs in the background over the batched
 		// compact-filter path; the live subscription above covers
-		// everything past the backfill's target. Failure to start is
-		// not fatal to the import — the key is imported and subscribed,
-		// and history can be requested again via rescanaddress.
-		if _, err := w.StartAddressBackfill(address, 0); err != nil {
-			log.Errorf("Unable to start backfill for imported "+
-				"address %v: %v", address, err)
+		// everything past the backfill's target. The decision is based
+		// on this wallet's persisted watermark, not on whether the key
+		// was already imported: each wallet has its own transaction
+		// store, so an address imported here earlier (or into another
+		// wallet) still needs a scan in THIS wallet if one never
+		// completed. Failure to start is not fatal to the import — the
+		// key is imported and subscribed, and history can be requested
+		// again via rescanaddress.
+		if _, done := w.BackfilledThrough(address.EncodeAddress()); !done {
+			if _, err := w.StartAddressBackfill(address, 0); err != nil {
+				log.Errorf("Unable to start backfill for imported "+
+					"address %v: %v", address, err)
+			}
 		}
 	}
 
