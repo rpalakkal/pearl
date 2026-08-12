@@ -5,6 +5,7 @@ import fs from 'fs';
 import path from 'path';
 import {WalletService} from './wallet-service/wallet-service';
 import {getCurrentNetworkConfig} from '../config/network-config';
+import {buildWalletArgs} from './wallet-process-args';
 
 const binaryNameMap: Record<string, Record<string, string>> = {
   win32: {
@@ -25,8 +26,8 @@ interface WalletProcessConfig {
   dataDir: string;
   rpcUser: string;
   rpcPassword: string;
-  peerAddress: string;
-  peerPort: number;
+  peerAddress?: string;
+  peerPort?: number;
 }
 
 class WalletProcess {
@@ -82,23 +83,7 @@ class WalletProcess {
   }
 
   getWalletArgs(): string[] {
-    const networkConfig = getCurrentNetworkConfig();
-    const args = [
-      '--usespv',
-      `--addpeer=${this.config.peerAddress}:${this.config.peerPort}`,
-      `--appdata=${this.config.dataDir}`,
-      `--username=${this.config.rpcUser}`,
-      `--password=${this.config.rpcPassword}`,
-      `--rpclisten=127.0.0.1:${networkConfig.rpcPort}`,
-      '--noservertls',
-    ];
-
-    // Add network flag if not mainnet
-    if (networkConfig.walletFlag) {
-      args.splice(2, 0, networkConfig.walletFlag);
-    }
-
-    return args;
+    return buildWalletArgs(this.config, getCurrentNetworkConfig());
   }
 
   createWalletAndGetSeed(passphrase?: string) {

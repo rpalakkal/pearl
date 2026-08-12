@@ -1,20 +1,30 @@
 import * as os from 'os';
 import * as fs from 'fs';
 import * as path from 'path';
-import { Socket } from 'net';
-import { promisify } from 'util';
+import {Socket} from 'net';
+import {promisify} from 'util';
 import dns from 'dns';
-import { ManagerApi } from '../../types/app-bridge.ts';
-import { WalletService } from './wallet-service/wallet-service.ts';
-import { WalletProcess } from './wallet-process.ts';
-import { displayToFs, fsToDisplay } from '../../utils/filename-utils.ts';
-import { getCurrentNetworkConfig, getCurrentNetwork, setCurrentNetwork, getAllNetworks, type Network } from '../config/network-config';
-import { getPeerAddress, getPeerPort, getPeerSettings as getConfigPeerSettings, setCustomPeer, resetToDefaultPeer } from '../config/peer-settings';
+import {ManagerApi} from '../../types/app-bridge.ts';
+import {WalletService} from './wallet-service/wallet-service.ts';
+import {WalletProcess} from './wallet-process.ts';
+import {displayToFs, fsToDisplay} from '../../utils/filename-utils.ts';
+import {
+  getCurrentNetworkConfig,
+  getCurrentNetwork,
+  setCurrentNetwork,
+  getAllNetworks,
+  type Network,
+} from '../config/network-config';
+import {
+  getCustomPeer,
+  getPeerSettings as getConfigPeerSettings,
+  setCustomPeer,
+  resetToDefaultPeer,
+} from '../config/peer-settings';
 import * as appLock from '../config/app-lock';
-import { randomBytes } from 'crypto';
+import {randomBytes} from 'crypto';
 
-
-let sessionRpcCreds: { rpcUser: string; rpcPassword: string } | null = null;
+let sessionRpcCreds: {rpcUser: string; rpcPassword: string} | null = null;
 function getSessionRpcCreds() {
   if (!sessionRpcCreds) {
     sessionRpcCreds = {
@@ -24,7 +34,6 @@ function getSessionRpcCreds() {
   }
   return sessionRpcCreds;
 }
-
 
 const dnsLookup = promisify(dns.lookup);
 interface WalletData {
@@ -55,13 +64,14 @@ const CHAIN_STATE_FILES = [
 
 function getBaseConfig() {
   const networkConfig = getCurrentNetworkConfig();
+  const customPeer = getCustomPeer();
   return {
     rpcHost: 'http://127.0.0.1',
     ...getSessionRpcCreds(),
     rpcPort: networkConfig.rpcPort,
     network: networkConfig.name,
-    peerAddress: getPeerAddress(),
-    peerPort: getPeerPort(),
+    peerAddress: customPeer?.address,
+    peerPort: customPeer?.port,
   };
 }
 
@@ -100,7 +110,7 @@ class ManagerService implements ManagerApi {
     }
 
     try {
-      fs.mkdirSync(walletDataDir, { recursive: true });
+      fs.mkdirSync(walletDataDir, {recursive: true});
     } catch (error) {
       if (isInvalidSeedWalletCreated) {
         console.log(
@@ -122,7 +132,7 @@ class ManagerService implements ManagerApi {
     this.walletProcess = new WalletProcess(config, this.walletService);
   }
 
-  async stopWalletProcess(options: { force?: boolean } = {}) {
+  async stopWalletProcess(options: {force?: boolean} = {}) {
     if (this.walletProcess && this.walletProcess.getStatus().isRunning) {
       await this.walletProcess.stop(options);
     }
@@ -156,7 +166,7 @@ class ManagerService implements ManagerApi {
     const walletDataDir = path.join(baseWalletDir, CHAIN_HOST_NAME);
     const networkConfig = getCurrentNetworkConfig();
     const walletDbPath = path.join(walletDataDir, networkConfig.dataSubdir, 'wallet.db');
-    const config = { ...getBaseConfig(), dataDir: walletDataDir };
+    const config = {...getBaseConfig(), dataDir: walletDataDir};
 
     this.walletService = new WalletService(config);
     this.walletProcess = new WalletProcess(config, this.walletService);
@@ -169,7 +179,7 @@ class ManagerService implements ManagerApi {
         throw new Error('Unlock the app before using hardware accounts');
       }
 
-      fs.mkdirSync(path.dirname(walletDbPath), { recursive: true });
+      fs.mkdirSync(path.dirname(walletDbPath), {recursive: true});
       this.seedChainStateFrom(path.dirname(walletDbPath), networkConfig.dataSubdir);
 
       // Reuse an existing vaulted passphrase (a second network's create must
@@ -207,7 +217,7 @@ class ManagerService implements ManagerApi {
       let newestDir: string | null = null;
       let newestMtime = 0;
 
-      for (const entry of fs.readdirSync(baseWalletDir, { withFileTypes: true })) {
+      for (const entry of fs.readdirSync(baseWalletDir, {withFileTypes: true})) {
         if (!entry.isDirectory() || entry.name === CHAIN_HOST_NAME) {
           continue;
         }
@@ -269,7 +279,7 @@ class ManagerService implements ManagerApi {
   // batch on the next open.
   async forceLockWallet() {
     return this.runTransition(async () => {
-      await this.stopWalletProcess({ force: true });
+      await this.stopWalletProcess({force: true});
       this.currentWallet = null;
     });
   }
@@ -297,24 +307,36 @@ class ManagerService implements ManagerApi {
     };
   }
 
-  async selectWallet(walletName: string): Promise<{ passphraseAvailable: boolean }> {
+  async selectWallet(walletName: string): Promise<{passphraseAvailable: boolean}> {
     if (isReservedWalletName(walletName)) {
       throw new Error(`"${walletName}" is a reserved wallet name`);
     }
 
-    // Validate peer before starting wallet
-    const peerAddress = getPeerAddress();
-    const peerPort = getPeerPort();
+    // Validate custom peer before starting wallet (if one is configured).
+    // When no custom peer is set the daemon falls back to DNS seeding, so
+    // there is nothing to pre-validate here. If a custom peer is set but
+    // unreachable, we warn and continue — the daemon still discovers peers
+    // via DNS seeding.
+    const customPeer = getCustomPeer();
 
-    console.log(`[ManagerService] Validating peer before starting wallet: ${peerAddress}:${peerPort}`);
-    const validation = await this.validatePeerAddress(peerAddress, peerPort);
+    if (customPeer) {
+      console.log(
+        `[ManagerService] Validating custom peer before starting wallet: ${customPeer.address}:${customPeer.port}`
+      );
+      const validation = await this.validatePeerAddress(customPeer.address, customPeer.port);
 
-    if (!validation.valid) {
-      console.error(`[ManagerService] ❌ Peer validation failed: ${validation.error}`);
-      throw new Error(validation.error || 'Cannot connect to peer node');
+      if (!validation.valid) {
+        console.warn(
+          `[ManagerService] ⚠️ Custom peer unreachable: ${validation.error}. Falling back to DNS seeders.`
+        );
+      } else {
+        console.log(`[ManagerService] ✅ Peer validation passed, starting wallet...`);
+      }
+    } else {
+      console.log(
+        `[ManagerService] No custom peer configured — relying on DNS seeders for peer discovery`
+      );
     }
-
-    console.log(`[ManagerService] ✅ Peer validation passed, starting wallet...`);
 
     return this.runTransition(async () => {
       try {
@@ -328,9 +350,9 @@ class ManagerService implements ManagerApi {
       await this.loadWallet(walletName, 'open');
       await this.startWalletProcess();
 
-      this.currentWallet = { name: walletName };
+      this.currentWallet = {name: walletName};
 
-      return { passphraseAvailable: await this.unlockFromVault(walletName) };
+      return {passphraseAvailable: await this.unlockFromVault(walletName)};
     });
   }
 
@@ -381,8 +403,8 @@ class ManagerService implements ManagerApi {
   // Wallet passphrases are generated randomly and stored in the app-lock
   // vault; the seed phrase is the recovery path. The legacy `password`
   // option is ignored.
-  async create(options: { name: string; password?: string }) {
-    const { name } = options;
+  async create(options: {name: string; password?: string}) {
+    const {name} = options;
 
     if (isReservedWalletName(name)) {
       throw new Error(`"${name}" is a reserved wallet name`);
@@ -413,16 +435,16 @@ class ManagerService implements ManagerApi {
 
       await this.startWalletProcess();
 
-      this.currentWallet = { name };
+      this.currentWallet = {name};
 
       await this.unlockFromVault(name);
 
-      return { seed: generatedSeed };
+      return {seed: generatedSeed};
     });
   }
 
-  async import(options: { name: string; seed: string; password?: string }) {
-    const { name, seed } = options;
+  async import(options: {name: string; seed: string; password?: string}) {
+    const {name, seed} = options;
 
     if (!name) {
       throw new Error('Wallet name is required');
@@ -459,18 +481,18 @@ class ManagerService implements ManagerApi {
         console.log('Failed to start wallet process:', error);
       }
 
-      this.currentWallet = { name };
+      this.currentWallet = {name};
 
       await this.unlockFromVault(name);
 
-      return { name, seed };
+      return {name, seed};
     });
   }
 
   // Renames a wallet: its data directory, its vault entries, and (when it is
   // the running wallet) stops the process so the renderer re-selects it under
   // the new name. Chain state moves with the directory.
-  async renameWallet(oldName: string, newName: string): Promise<{ name: string }> {
+  async renameWallet(oldName: string, newName: string): Promise<{name: string}> {
     const trimmedNewName = newName?.trim();
     if (!trimmedNewName) {
       throw new Error('Wallet name is required');
@@ -510,7 +532,7 @@ class ManagerService implements ManagerApi {
         appLock.renameWalletEntries(key, trimmedNewName);
       }
 
-      return { name: trimmedNewName };
+      return {name: trimmedNewName};
     });
   }
 
@@ -528,11 +550,11 @@ class ManagerService implements ManagerApi {
 
     return this.runTransition(async () => {
       if (this.currentWallet?.name === name) {
-        await this.stopWalletProcess({ force: true });
+        await this.stopWalletProcess({force: true});
         this.currentWallet = null;
       }
 
-      fs.rmSync(path.join(baseWalletDir, displayToFs(name)), { recursive: true, force: true });
+      fs.rmSync(path.join(baseWalletDir, displayToFs(name)), {recursive: true, force: true});
 
       for (const key of new Set([name, displayToFs(name)])) {
         appLock.removeWalletEntries(key);
@@ -546,10 +568,10 @@ class ManagerService implements ManagerApi {
   // Contacts and peer/network settings are preserved.
   async resetApp(): Promise<void> {
     return this.runTransition(async () => {
-      await this.stopWalletProcess({ force: true });
+      await this.stopWalletProcess({force: true});
       this.currentWallet = null;
       try {
-        fs.rmSync(baseWalletDir, { recursive: true, force: true });
+        fs.rmSync(baseWalletDir, {recursive: true, force: true});
       } catch (error) {
         console.error('Failed to remove wallet data during reset:', error);
       }
@@ -562,12 +584,17 @@ class ManagerService implements ManagerApi {
     const networkConfig = getCurrentNetworkConfig();
 
     if (fs.existsSync(baseWalletDir)) {
-      const entries = await fs.promises.readdir(baseWalletDir, { withFileTypes: true });
+      const entries = await fs.promises.readdir(baseWalletDir, {withFileTypes: true});
       walletNames = entries
         .filter(entry => entry.isDirectory() && entry.name !== CHAIN_HOST_NAME)
         .map(entry => fsToDisplay(entry.name))
         .filter(name => {
-          const walletDbPath = path.join(baseWalletDir, name, networkConfig.dataSubdir, 'wallet.db');
+          const walletDbPath = path.join(
+            baseWalletDir,
+            name,
+            networkConfig.dataSubdir,
+            'wallet.db'
+          );
           return fs.existsSync(walletDbPath);
         })
         // readdir order is filesystem-dependent; sort so defaultWallet is
@@ -575,7 +602,7 @@ class ManagerService implements ManagerApi {
         .sort((left, right) => left.localeCompare(right));
     }
 
-    return { walletNames, defaultWallet: walletNames.length > 0 ? walletNames[0] : undefined };
+    return {walletNames, defaultWallet: walletNames.length > 0 ? walletNames[0] : undefined};
   }
 
   // Network management methods
@@ -603,7 +630,7 @@ class ManagerService implements ManagerApi {
     // Update network
     setCurrentNetwork(network as Network);
 
-    return { success: true, network };
+    return {success: true, network};
   }
 
   // Peer settings management
@@ -611,7 +638,10 @@ class ManagerService implements ManagerApi {
     return getConfigPeerSettings();
   }
 
-  async validatePeerAddress(address: string, port: number): Promise<{ valid: boolean; error?: string }> {
+  async validatePeerAddress(
+    address: string,
+    port: number
+  ): Promise<{valid: boolean; error?: string}> {
     try {
       // Step 1: Check if host resolves via DNS
       console.log(`[ManagerService] Validating peer: ${address}:${port}`);
@@ -623,12 +653,12 @@ class ManagerService implements ManagerApi {
         console.error(`[ManagerService] ❌ DNS lookup failed for ${address}:`, dnsError);
         return {
           valid: false,
-          error: `Please make sure your internet connection is stable and that ${address} is responsive`
+          error: `Please make sure your internet connection is stable and that ${address} is responsive`,
         };
       }
 
       // Step 2: Try to connect to the port
-      return new Promise((resolve) => {
+      return new Promise(resolve => {
         const socket = new Socket();
         const timeout = 5000; // 5 second timeout
 
@@ -641,7 +671,7 @@ class ManagerService implements ManagerApi {
         socket.on('connect', () => {
           console.log(`[ManagerService] ✅ Successfully connected to ${address}:${port}`);
           cleanup();
-          resolve({ valid: true });
+          resolve({valid: true});
         });
 
         socket.on('timeout', () => {
@@ -649,16 +679,19 @@ class ManagerService implements ManagerApi {
           cleanup();
           resolve({
             valid: false,
-            error: `Connection timeout: ${address}:${port} is not responding. Please verify the address and port.`
+            error: `Connection timeout: ${address}:${port} is not responding. Please verify the address and port.`,
           });
         });
 
-        socket.on('error', (err) => {
-          console.error(`[ManagerService] ❌ Connection error for ${address}:${port}:`, err.message);
+        socket.on('error', err => {
+          console.error(
+            `[ManagerService] ❌ Connection error for ${address}:${port}:`,
+            err.message
+          );
           cleanup();
           resolve({
             valid: false,
-            error: `Cannot connect to ${address}:${port}. Error: ${err.message}`
+            error: `Cannot connect to ${address}:${port}. Error: ${err.message}`,
           });
         });
 
@@ -667,7 +700,7 @@ class ManagerService implements ManagerApi {
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       console.error(`[ManagerService] ❌ Peer validation failed:`, errorMessage);
-      return { valid: false, error: `Validation failed: ${errorMessage}` };
+      return {valid: false, error: `Validation failed: ${errorMessage}`};
     }
   }
 
@@ -678,7 +711,7 @@ class ManagerService implements ManagerApi {
     // Update peer settings (don't validate here - validate when unlocking)
     setCustomPeer(address, port);
 
-    return { success: true };
+    return {success: true};
   }
 
   async resetPeerToDefault() {
@@ -688,8 +721,8 @@ class ManagerService implements ManagerApi {
     // Reset to default
     resetToDefaultPeer();
 
-    return { success: true };
+    return {success: true};
   }
 }
 
-export { ManagerService };
+export {ManagerService};

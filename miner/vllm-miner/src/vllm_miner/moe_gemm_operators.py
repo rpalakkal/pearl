@@ -5,6 +5,7 @@ from blake3 import blake3
 from miner_base.commitment_hash import CommitmentHasher
 from miner_base.gpu_matmul_config import GPUMatmulConfigFactory
 from miner_utils import get_logger
+from pearl_gateway.comm.dataclasses import MiningJob
 from pearl_gateway.comm.mining_configuration import MoEConfig
 from pearl_gemm import (
     commitment_hash_from_merkle_roots,
@@ -68,6 +69,7 @@ class MoERoutingLayout:
 class MoENoiseContext:
     """Pre-computed tensors for one MoE forward pass (shared across experts)."""
 
+    mining_job: MiningJob  # job whose header/target the PoW key was derived from
     commitment_hash_A: torch.Tensor  # (32,) uint8
     commitment_hash_B: torch.Tensor  # (32,) uint8
     EAL: torch.Tensor  # (m, r) int8
@@ -148,6 +150,14 @@ def prepare_moe_noising(
     A_hash = _hash_2d(A_q.contiguous().view(torch.uint8), key_tensor, device)
     B_hash = _hash_2d(B_stacked.contiguous().view(torch.uint8), key_tensor, device)
 
+    # V3 (salted) mining: the kernel salts the raw roots before the routing
+    # fold. The proof's ``n`` is the per-expert intermediate dimension.
+    salted_dims = (
+        (num_tokens, num_stacked_weight_rows // num_experts)
+        if mining_job.cert_version.uses_salted_seeds
+        else None
+    )
+
     num_routed_slots = num_tokens * top_k
     routing_data = torch.empty(num_routed_slots, dtype=torch.int32, device=device)
     slot_indices = torch.empty(num_routed_slots, dtype=torch.int32, device=device)
@@ -181,6 +191,7 @@ def prepare_moe_noising(
         commitment_hash_B,
         routing_root=routing_hash,
         offsets_hash=offsets_hash,
+        salted_dims=salted_dims,
     )
 
     (
@@ -203,6 +214,7 @@ def prepare_moe_noising(
     )
 
     return MoENoiseContext(
+        mining_job=mining_job,
         commitment_hash_A=commitment_hash_A,
         commitment_hash_B=commitment_hash_B,
         EAL=EAL,

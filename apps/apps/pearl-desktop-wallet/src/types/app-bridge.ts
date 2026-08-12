@@ -276,10 +276,8 @@ interface ManagerApi {
 
   getPeerSettings: () => Promise<{
     network: string;
-    currentAddress: string;
-    currentPort: number;
-    defaultAddress: string;
-    defaultPort: number;
+    customPeerAddress: string;
+    customPeerPort?: number;
     isCustom: boolean;
   }>;
 

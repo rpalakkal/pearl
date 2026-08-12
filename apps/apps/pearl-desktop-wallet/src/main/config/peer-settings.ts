@@ -1,11 +1,15 @@
 /**
- * Peer settings management - allows users to configure custom peer addresses per network
+ * Peer settings management.
+ *
+ * By default the wallet relies on the oyster daemon's built-in DNS seeding
+ * — no --addpeer flag is passed. Users can optionally configure a custom peer
+ * (IPv4 or CNAME) that is forwarded to the daemon via --addpeer.
  */
 import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
-import { getCurrentNetwork, getCurrentNetworkConfig } from './network-config';
-import { MAINNET_DEFAULT_PEER_ADDRESSES, TESTNET_DEFAULT_PEER_ADDRESSES } from './consts';
+import {getCurrentNetwork} from './network-config.ts';
+import {LEGACY_MAINNET_PEER_ADDRESSES, LEGACY_TESTNET_PEER_ADDRESSES} from './consts.ts';
 
 interface NetworkPeerSettings {
   customPeerAddress?: string;
@@ -17,22 +21,43 @@ interface AllNetworksPeerSettings {
   testnet: NetworkPeerSettings;
 }
 
-const SETTINGS_DIR = path.join(os.homedir(), '.pearl-wallet', 'settings');
-const SETTINGS_FILE = path.join(SETTINGS_DIR, 'peer-settings.json');
+// PEARL_WALLET_SETTINGS_DIR is a test-only override so settings tests can run
+// against a temp directory instead of the user's real wallet settings.
+function settingsDir(): string {
+  return (
+    process.env.PEARL_WALLET_SETTINGS_DIR ?? path.join(os.homedir(), '.pearl-wallet', 'settings')
+  );
+}
+
+function settingsFile(): string {
+  return path.join(settingsDir(), 'peer-settings.json');
+}
 
 // Ensure settings directory exists
 function ensureSettingsDir() {
-  if (!fs.existsSync(SETTINGS_DIR)) {
-    fs.mkdirSync(SETTINGS_DIR, { recursive: true });
+  const dir = settingsDir();
+  if (!fs.existsSync(dir)) {
+    fs.mkdirSync(dir, {recursive: true});
   }
+}
+
+// Returns true when the saved custom peer is one of the legacy hardcoded
+// hosts. Those addresses are no longer valid defaults, so stale
+// peer-settings.json entries are cleared on load (migration).
+function isLegacyPeer(address: string): boolean {
+  const network = getCurrentNetwork();
+  const legacy =
+    network === 'mainnet' ? LEGACY_MAINNET_PEER_ADDRESSES : LEGACY_TESTNET_PEER_ADDRESSES;
+  return legacy.includes(address);
 }
 
 function loadAllNetworksPeerSettings(): AllNetworksPeerSettings {
   ensureSettingsDir();
+  const file = settingsFile();
 
-  if (fs.existsSync(SETTINGS_FILE)) {
+  if (fs.existsSync(file)) {
     try {
-      const data = fs.readFileSync(SETTINGS_FILE, 'utf-8');
+      const data = fs.readFileSync(file, 'utf-8');
       const parsed = JSON.parse(data);
       return {
         mainnet: parsed.mainnet ?? {},
@@ -43,13 +68,23 @@ function loadAllNetworksPeerSettings(): AllNetworksPeerSettings {
     }
   }
 
-  return { mainnet: {}, testnet: {} };
+  return {mainnet: {}, testnet: {}};
 }
 
-// Load peer settings for the current network
+// Load peer settings for the current network, migrating stale legacy entries.
 function loadPeerSettings(): NetworkPeerSettings {
-  const peerSettings = loadAllNetworksPeerSettings();
-  return peerSettings[getCurrentNetwork()] ?? {};
+  const allSettings = loadAllNetworksPeerSettings();
+  const settings = allSettings[getCurrentNetwork()] ?? {};
+
+  // Runtime migration: ignore a saved legacy hardcoded host so the wallet
+  // falls back to DNS seeding. The file is rewritten only when the user later
+  // saves or resets peer settings.
+  if (settings.customPeerAddress && isLegacyPeer(settings.customPeerAddress)) {
+    delete settings.customPeerAddress;
+    delete settings.customPeerPort;
+  }
+
+  return settings;
 }
 
 // Save peer settings for the current network
@@ -60,32 +95,29 @@ function savePeerSettings(settings: NetworkPeerSettings) {
   peerSettings[getCurrentNetwork()] = settings;
 
   try {
-    fs.writeFileSync(SETTINGS_FILE, JSON.stringify(peerSettings, null, 2), 'utf-8');
+    fs.writeFileSync(settingsFile(), JSON.stringify(peerSettings, null, 2), 'utf-8');
   } catch (error) {
     console.error('Failed to save peer settings:', error);
   }
 }
 
-// Get current peer address (custom or default) for active network
-export function getPeerAddress(): string {
-  const settings = loadPeerSettings();
-  if (settings.customPeerAddress) {
-    return settings.customPeerAddress;
-  }
-
-  const networkConfig = getCurrentNetworkConfig();
-  return networkConfig.defaultPeerAddress;
+export interface CustomPeer {
+  address: string;
+  port: number;
 }
 
-// Get current peer port (custom or default) for active network
-export function getPeerPort(): number {
+// Get the user-configured custom peer, or null when none is set (in which case
+// the daemon falls back to DNS seeding).
+export function getCustomPeer(): CustomPeer | null {
   const settings = loadPeerSettings();
-  if (settings.customPeerPort) {
-    return settings.customPeerPort;
+  const address = settings.customPeerAddress?.trim();
+  const port = settings.customPeerPort;
+
+  if (!address || !port) {
+    return null;
   }
 
-  const networkConfig = getCurrentNetworkConfig();
-  return networkConfig.defaultPeerPort;
+  return {address, port};
 }
 
 // Set custom peer address for the active network only
@@ -96,7 +128,7 @@ export function setCustomPeer(address: string, port: number) {
   savePeerSettings(settings);
 }
 
-// Reset to default peer for the active network only
+// Reset to default (DNS seeders) for the active network only
 export function resetToDefaultPeer() {
   const settings = loadPeerSettings();
   delete settings.customPeerAddress;
@@ -107,19 +139,12 @@ export function resetToDefaultPeer() {
 // Get peer settings info for the active network
 export function getPeerSettings() {
   const network = getCurrentNetwork();
-  const networkConfig = getCurrentNetworkConfig();
-  const settings = loadPeerSettings();
-
-  const defaultAddresses =
-    network === 'mainnet' ? MAINNET_DEFAULT_PEER_ADDRESSES : TESTNET_DEFAULT_PEER_ADDRESSES;
-  const isDefaultFoundationNode = defaultAddresses.includes(settings.customPeerAddress ?? '');
+  const customPeer = getCustomPeer();
 
   return {
     network,
-    currentAddress: getPeerAddress(),
-    currentPort: getPeerPort(),
-    defaultAddress: networkConfig.defaultPeerAddress,
-    defaultPort: networkConfig.defaultPeerPort,
-    isCustom: (settings.customPeerAddress && !isDefaultFoundationNode) || false,
+    customPeerAddress: customPeer?.address ?? '',
+    customPeerPort: customPeer?.port,
+    isCustom: customPeer !== null,
   };
 }

@@ -240,6 +240,85 @@ func TestPeerConnection(t *testing.T) {
 	outPeer.WaitForDisconnect()
 }
 
+// TestProtocolVersionFloor exercises the version-message negotiation path at
+// the network's protocol floor. A v1 peer must be disconnected, while a peer
+// advertising the minimum supported v2 protocol must complete negotiation.
+func TestProtocolVersionFloor(t *testing.T) {
+	const (
+		protocolV1 = uint32(1)
+		protocolV2 = uint32(2)
+	)
+	require.Equal(t, protocolV2,
+		uint32(peer.MinAcceptableProtocolVersion))
+
+	newConfig := func(protocolVersion uint32) *peer.Config {
+		return &peer.Config{
+			UserAgentName:    "peer",
+			UserAgentVersion: "1.0",
+			ChainParams:      &chaincfg.MainNetParams,
+			ProtocolVersion:  protocolVersion,
+			AllowSelfConns:   true,
+		}
+	}
+
+	t.Run("reject protocol v1", func(t *testing.T) {
+		require.Less(t, protocolV1,
+			uint32(peer.MinAcceptableProtocolVersion))
+
+		inPeer := peer.NewInboundPeer(
+			newConfig(peer.MinAcceptableProtocolVersion),
+		)
+		outPeer, err := peer.NewOutboundPeer(
+			newConfig(protocolV1), "10.0.0.2:8333",
+		)
+		require.NoError(t, err)
+
+		require.NoError(t, setupPeerConnection(inPeer, outPeer))
+		waitForSignal(t, inPeer.Done(), testWaitTimeout,
+			"inbound peer accepted obsolete protocol version")
+		waitForSignal(t, outPeer.Done(), testWaitTimeout,
+			"obsolete outbound peer did not disconnect")
+
+		require.True(t, inPeer.VersionKnown())
+		require.Equal(t, protocolV1, inPeer.ProtocolVersion())
+		require.False(t, inPeer.Connected())
+		require.False(t, outPeer.Connected())
+	})
+
+	t.Run("accept protocol v2", func(t *testing.T) {
+		verack := make(chan struct{}, 2)
+		inCfg := newConfig(protocolV2)
+		inCfg.Listeners.OnVerAck = func(*peer.Peer, *wire.MsgVerAck) {
+			verack <- struct{}{}
+		}
+		outCfg := newConfig(protocolV2)
+		outCfg.Listeners.OnVerAck = func(*peer.Peer, *wire.MsgVerAck) {
+			verack <- struct{}{}
+		}
+
+		inPeer := peer.NewInboundPeer(inCfg)
+		outPeer, err := peer.NewOutboundPeer(outCfg, "10.0.0.2:8333")
+		require.NoError(t, err)
+		t.Cleanup(func() {
+			inPeer.Disconnect()
+			outPeer.Disconnect()
+			inPeer.WaitForDisconnect()
+			outPeer.WaitForDisconnect()
+		})
+
+		require.NoError(t, setupPeerConnection(inPeer, outPeer))
+		for i := 0; i < 2; i++ {
+			waitForSignal(t, verack, testWaitTimeout,
+				"verack signal %d", i)
+		}
+
+		require.True(t, inPeer.Connected())
+		require.True(t, outPeer.Connected())
+		require.Equal(t, protocolV2, inPeer.ProtocolVersion())
+		require.Equal(t, protocolV2, outPeer.ProtocolVersion())
+	})
+}
+
 // TestPeerListeners verifies that each message listener callback fires when
 // the corresponding message type is received over a live v2 connection.
 func TestPeerListeners(t *testing.T) {

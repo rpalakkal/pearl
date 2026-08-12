@@ -127,13 +127,13 @@ var rpcHandlers = map[string]struct {
 	"setaccount":    {handler: unsupported, noHelp: true},
 
 	// Extensions to the reference client JSON-RPC API
-	"chainsynced":      {handler: chainSynced},
-	"getsyncprogress":  {handler: getSyncProgress},
+	"chainsynced":       {handler: chainSynced},
+	"getsyncprogress":   {handler: getSyncProgress},
 	"rescanaddress":     {handler: rescanAddress, noHelp: true},
 	"getrescanstatus":   {handler: getRescanStatus, noHelp: true},
 	"getaddresshistory": {handler: getAddressHistory, noHelp: true},
-	"createnewaccount": {handler: createNewAccount},
-	"getbestblock":     {handler: getBestBlock},
+	"createnewaccount":  {handler: createNewAccount},
+	"getbestblock":      {handler: getBestBlock},
 	// This was an extension but the reference implementation added it as
 	// well, but with a different API (no account parameter).  It's listed
 	// here because it hasn't been update to use the reference
@@ -232,33 +232,6 @@ func lazyApplyHandler(request *btcjson.Request, w *wallet.Wallet, chainClient ch
 				Message: "Chain RPC is inactive",
 			}
 		}
-	}
-}
-
-// makeResponse makes the JSON-RPC response struct for the result and error
-// returned by a requestHandler.  The returned response is not ready for
-// marshaling and sending off to a client, but must be
-func makeResponse(id, result interface{}, err error) btcjson.Response {
-	idPtr := idPointer(id)
-	if err != nil {
-		return btcjson.Response{
-			ID:    idPtr,
-			Error: jsonError(err),
-		}
-	}
-	resultBytes, err := json.Marshal(result)
-	if err != nil {
-		return btcjson.Response{
-			ID: idPtr,
-			Error: &btcjson.RPCError{
-				Code:    btcjson.ErrRPCInternal.Code,
-				Message: "Unexpected error marshalling result",
-			},
-		}
-	}
-	return btcjson.Response{
-		ID:     idPtr,
-		Result: json.RawMessage(resultBytes),
 	}
 }
 
